@@ -135,7 +135,7 @@ release:
 
     ### Go Install
     ```bash
-    go install github.com/heartwilltell/scyllamigrate/cmd/scyllamigrate@{{ .Tag }}
+    go install github.com/heartwilltell/scyllamigrate/cmd@{{ .Tag }}
     ```
 
     ### Docker
