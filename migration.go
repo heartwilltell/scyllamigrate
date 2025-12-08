@@ -69,7 +69,7 @@ type AppliedMigration struct {
 	// Description is the human-readable description.
 	Description string
 
-	// Checksum is the MD5 hash of the migration content.
+	// Checksum is the SHA-256 hash of the migration content.
 	Checksum string
 
 	// AppliedAt is when the migration was applied.
@@ -97,7 +97,7 @@ type Status struct {
 //   - 000001_create_users.up.cql
 //   - 000001_create_users.down.sql
 //   - 1_initial.up.cql
-var migrationRegex = regexp.MustCompile(`^([0-9]+)_(.+)\.(up|down)\.(cql|sql)$`)
+var migrationRegex = regexp.MustCompile(`^(\d+)_(.+)\.(up|down)\.(cql|sql)$`)
 
 // ParseMigration parses a filename into a Migration struct.
 // Returns an error if the filename does not match the expected pattern.

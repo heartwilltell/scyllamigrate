@@ -1,6 +1,7 @@
 package scyllamigrate
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -26,7 +27,7 @@ type Source interface {
 type FSSource struct {
 	fsys       fs.FS
 	migrations map[uint64]*MigrationPair
-	versions   []uint64 // sorted
+	versions   []uint64 // sorted.
 }
 
 // NewFSSource creates a Source from an fs.FS instance.
@@ -86,10 +87,16 @@ func (s *FSSource) scan() error {
 			pair.Up = m
 		case Down:
 			pair.Down = m
+		default:
+			return &SourceError{
+				Version: m.Version,
+				Op:      "scan",
+				Err:     fmt.Errorf("unknown migration direction: %s", m.Direction),
+			}
 		}
 	}
 
-	// Sort versions in ascending order
+	// Sort versions in ascending order.
 	sort.Slice(s.versions, func(i, j int) bool {
 		return s.versions[i] < s.versions[j]
 	})
@@ -146,7 +153,7 @@ func (s *FSSource) ReadDown(version uint64) (io.ReadCloser, error) {
 
 // Close releases any resources held by the source.
 // For FSSource, this is a no-op as fs.FS doesn't require cleanup.
-func (s *FSSource) Close() error {
+func (*FSSource) Close() error {
 	return nil
 }
 

@@ -14,15 +14,35 @@ import (
 	"github.com/heartwilltell/scyllamigrate"
 )
 
-// Global configuration flags
-var (
+// default chmod permissions.
+const (
+	migrationsDirMode os.FileMode = 0o755
+	migrationFileMode os.FileMode = 0o600
+)
+
+// config holds global configuration flags.
+type config struct {
 	hosts       string
 	keyspace    string
 	dir         string
 	consistency string
 	timeout     time.Duration
 	table       string
-)
+}
+
+// Global configuration flags.
+var cfg config
+
+type managedMigrator struct {
+	*scyllamigrate.Migrator
+	cleanup func()
+}
+
+func (m *managedMigrator) Close() {
+	if m.cleanup != nil {
+		m.cleanup()
+	}
+}
 
 func main() {
 	rootCmd := &scotty.Command{
@@ -30,12 +50,30 @@ func main() {
 		Short: "ScyllaDB schema migration tool",
 		Long:  "A tool for managing ScyllaDB schema migrations with up/down support.",
 		SetFlags: func(f *scotty.FlagSet) {
-			f.StringVarE(&hosts, "hosts", "SCYLLA_HOSTS", "localhost:9042", "Comma-separated list of ScyllaDB hosts")
+			f.StringVarE(
+				&hosts,
+				"hosts",
+				"SCYLLA_HOSTS",
+				"localhost:9042",
+				"Comma-separated list of ScyllaDB hosts",
+			)
 			f.StringVarE(&keyspace, "keyspace", "SCYLLA_KEYSPACE", "", "Target keyspace (required)")
 			f.StringVarE(&dir, "dir", "MIGRATIONS_DIR", "./migrations", "Migrations directory")
-			f.StringVarE(&consistency, "consistency", "SCYLLA_CONSISTENCY", "quorum", "Consistency level (any, one, two, three, quorum, all, local_quorum, each_quorum, local_one)")
+			f.StringVarE(
+				&consistency,
+				"consistency",
+				"SCYLLA_CONSISTENCY",
+				"quorum",
+				"Consistency level (any, one, two, three, quorum, all, local_quorum, each_quorum, local_one)",
+			)
 			f.DurationVarE(&timeout, "timeout", "SCYLLA_TIMEOUT", 30*time.Second, "Operation timeout")
-			f.StringVarE(&table, "table", "SCYLLA_MIGRATIONS_TABLE", "schema_migrations", "Migration history table name")
+			f.StringVarE(
+				&table,
+				"table",
+				"SCYLLA_MIGRATIONS_TABLE",
+				"schema_migrations",
+				"Migration history table name",
+			)
 		},
 	}
 
@@ -63,12 +101,12 @@ func upCmd() *scotty.Command {
 		SetFlags: func(f *scotty.FlagSet) {
 			f.IntVar(&steps, "n", 0, "Number of migrations to apply (0 = all)")
 		},
-		Run: func(cmd *scotty.Command, args []string) error {
-			migrator, cleanup, err := createMigrator()
+		Run: func(_ *scotty.Command, _ []string) error {
+			migrator, err := createMigrator()
 			if err != nil {
 				return err
 			}
-			defer cleanup()
+			defer migrator.Close()
 
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
@@ -107,12 +145,12 @@ func downCmd() *scotty.Command {
 		SetFlags: func(f *scotty.FlagSet) {
 			f.IntVar(&steps, "n", 1, "Number of migrations to rollback")
 		},
-		Run: func(cmd *scotty.Command, args []string) error {
-			migrator, cleanup, err := createMigrator()
+		Run: func(_ *scotty.Command, _ []string) error {
+			migrator, err := createMigrator()
 			if err != nil {
 				return err
 			}
-			defer cleanup()
+			defer migrator.Close()
 
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
@@ -138,12 +176,12 @@ func statusCmd() *scotty.Command {
 		Name:  "status",
 		Short: "Show migration status",
 		Long:  "Display the current migration status including applied and pending migrations.",
-		Run: func(cmd *scotty.Command, args []string) error {
-			migrator, cleanup, err := createMigrator()
+		Run: func(_ *scotty.Command, _ []string) error {
+			migrator, err := createMigrator()
 			if err != nil {
 				return err
 			}
-			defer cleanup()
+			defer migrator.Close()
 
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
@@ -190,47 +228,47 @@ func createCmd() *scotty.Command {
 		SetFlags: func(f *scotty.FlagSet) {
 			f.StringVar(&ext, "ext", "cql", "File extension (cql or sql)")
 		},
-		Run: func(cmd *scotty.Command, args []string) error {
+		Run: func(_ *scotty.Command, args []string) error {
 			if len(args) < 1 {
-				return fmt.Errorf("migration name is required")
+				return errors.New("migration name is required")
 			}
 
 			name := args[0]
 
-			// Validate extension
+			// Validate extension.
 			if ext != "cql" && ext != "sql" {
 				return fmt.Errorf("invalid extension: %s (must be cql or sql)", ext)
 			}
 
-			// Ensure migrations directory exists
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			// Ensure migrations directory exists.
+			if err := os.MkdirAll(dir, migrationsDirMode); err != nil {
 				return fmt.Errorf("failed to create migrations directory: %w", err)
 			}
 
-			// Find the next version number
+			// Find the next version number.
 			nextVersion, err := findNextVersion(dir)
 			if err != nil {
 				return err
 			}
 
-			// Create filenames
+			// Create filenames.
 			upFile := fmt.Sprintf("%06d_%s.up.%s", nextVersion, name, ext)
 			downFile := fmt.Sprintf("%06d_%s.down.%s", nextVersion, name, ext)
 
 			upPath := filepath.Join(dir, upFile)
 			downPath := filepath.Join(dir, downFile)
 
-			// Create up migration file
-			if err := os.WriteFile(upPath, []byte("-- Migration: "+name+" (up)\n\n"), 0644); err != nil {
+			// Create up migration file.
+			if err := os.WriteFile(upPath, []byte("-- Migration: "+name+" (up)\n\n"), migrationFileMode); err != nil {
 				return fmt.Errorf("failed to create up migration: %w", err)
 			}
 
-			// Create down migration file
-			if err := os.WriteFile(downPath, []byte("-- Migration: "+name+" (down)\n\n"), 0644); err != nil {
+			// Create down migration file.
+			if err := os.WriteFile(downPath, []byte("-- Migration: "+name+" (down)\n\n"), migrationFileMode); err != nil {
 				return fmt.Errorf("failed to create down migration: %w", err)
 			}
 
-			fmt.Printf("Created migration files:\n")
+			fmt.Println("Created migration files:")
 			fmt.Printf("  %s\n", upPath)
 			fmt.Printf("  %s\n", downPath)
 
@@ -244,12 +282,12 @@ func versionCmd() *scotty.Command {
 		Name:  "version",
 		Short: "Show current migration version",
 		Long:  "Display the current migration version number.",
-		Run: func(cmd *scotty.Command, args []string) error {
-			migrator, cleanup, err := createMigrator()
+		Run: func(_ *scotty.Command, _ []string) error {
+			migrator, err := createMigrator()
 			if err != nil {
 				return err
 			}
-			defer cleanup()
+			defer migrator.Close()
 
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
@@ -271,41 +309,41 @@ func versionCmd() *scotty.Command {
 }
 
 // createMigrator creates a new Migrator instance with the configured options.
-// Returns the migrator, a cleanup function, and any error.
-func createMigrator() (*scyllamigrate.Migrator, func(), error) {
+// Returns a managed migrator with a cleanup hook.
+func createMigrator() (*managedMigrator, error) {
 	if keyspace == "" {
-		return nil, nil, fmt.Errorf("keyspace is required (use --keyspace or SCYLLA_KEYSPACE)")
+		return nil, errors.New("keyspace is required (use --keyspace or SCYLLA_KEYSPACE)")
 	}
 
-	// Parse hosts
+	// Parse hosts.
 	hostList := strings.Split(hosts, ",")
 	for i := range hostList {
 		hostList[i] = strings.TrimSpace(hostList[i])
 	}
 
-	// Create cluster configuration
+	// Create cluster configuration.
 	cluster := gocql.NewCluster(hostList...)
 	cluster.Keyspace = keyspace
 	cluster.Consistency = parseConsistency(consistency)
 	cluster.Timeout = timeout
 
-	// Create session
+	// Create session.
 	session, err := cluster.CreateSession()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to ScyllaDB: %w", err)
+		return nil, fmt.Errorf("failed to connect to ScyllaDB: %w", err)
 	}
 
-	// Create migrator
+	// Create migrator.
 	migrator, err := scyllamigrate.New(session,
 		scyllamigrate.WithDir(dir),
 		scyllamigrate.WithKeyspace(keyspace),
 		scyllamigrate.WithHistoryTable(table),
 		scyllamigrate.WithConsistency(parseConsistency(consistency)),
-		scyllamigrate.WithStdLogger(nil), // Use default logger
+		scyllamigrate.WithStdLogger(nil), // Use default logger.
 	)
 	if err != nil {
 		session.Close()
-		return nil, nil, err
+		return nil, err
 	}
 
 	cleanup := func() {
@@ -313,7 +351,10 @@ func createMigrator() (*scyllamigrate.Migrator, func(), error) {
 		session.Close()
 	}
 
-	return migrator, cleanup, nil
+	return &managedMigrator{
+		Migrator: migrator,
+		cleanup:  cleanup,
+	}, nil
 }
 
 // parseConsistency converts a string to gocql.Consistency.
@@ -327,8 +368,6 @@ func parseConsistency(s string) gocql.Consistency {
 		return gocql.Two
 	case "three":
 		return gocql.Three
-	case "quorum":
-		return gocql.Quorum
 	case "all":
 		return gocql.All
 	case "local_quorum", "localquorum":
@@ -337,9 +376,9 @@ func parseConsistency(s string) gocql.Consistency {
 		return gocql.EachQuorum
 	case "local_one", "localone":
 		return gocql.LocalOne
-	default:
-		return gocql.Quorum
 	}
+
+	return gocql.Quorum
 }
 
 // findNextVersion scans the migrations directory and returns the next version number.

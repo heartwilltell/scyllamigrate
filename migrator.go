@@ -2,7 +2,7 @@ package scyllamigrate
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -122,7 +122,7 @@ func (m *Migrator) DownTo(ctx context.Context, version uint64) (int, error) {
 		return 0, err
 	}
 
-	// Sort by version descending
+	// Sort by version descending.
 	sort.Slice(applied, func(i, j int) bool {
 		return applied[i].Version > applied[j].Version
 	})
@@ -152,7 +152,7 @@ func (m *Migrator) Steps(ctx context.Context, n int) error {
 	}
 
 	if n > 0 {
-		// Apply up migrations
+		// Apply up migrations.
 		pending, err := m.Pending(ctx)
 		if err != nil {
 			return err
@@ -163,6 +163,7 @@ func (m *Migrator) Steps(ctx context.Context, n int) error {
 		}
 
 		count := n
+
 		if count > len(pending) {
 			count = len(pending)
 		}
@@ -173,7 +174,7 @@ func (m *Migrator) Steps(ctx context.Context, n int) error {
 			}
 		}
 	} else {
-		// Rollback migrations
+		// Rollback migrations.
 		applied, err := m.getAppliedMigrations(ctx)
 		if err != nil {
 			return err
@@ -183,7 +184,7 @@ func (m *Migrator) Steps(ctx context.Context, n int) error {
 			return ErrNoChange
 		}
 
-		// Sort by version descending
+		// Sort by version descending.
 		sort.Slice(applied, func(i, j int) bool {
 			return applied[i].Version > applied[j].Version
 		})
@@ -235,12 +236,7 @@ func (m *Migrator) Status(ctx context.Context) (*Status, error) {
 
 // Version returns the current migration version (0 if none applied).
 func (m *Migrator) Version(ctx context.Context) (uint64, error) {
-	exists, err := m.historyTableExists(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	if !exists {
+	if !m.historyTableExists(ctx) {
 		return 0, nil
 	}
 
@@ -260,6 +256,7 @@ func (m *Migrator) Pending(ctx context.Context) ([]*MigrationPair, error) {
 	}
 
 	var pending []*MigrationPair
+
 	for _, pair := range all {
 		if !appliedVersions[pair.Version] {
 			pending = append(pending, pair)
@@ -271,12 +268,7 @@ func (m *Migrator) Pending(ctx context.Context) ([]*MigrationPair, error) {
 
 // Applied returns migrations that have been applied.
 func (m *Migrator) Applied(ctx context.Context) ([]*AppliedMigration, error) {
-	exists, err := m.historyTableExists(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if !exists {
+	if !m.historyTableExists(ctx) {
 		return nil, nil
 	}
 
@@ -316,7 +308,12 @@ func (m *Migrator) applyUp(ctx context.Context, pair *MigrationPair) error {
 	}
 	duration := time.Since(start)
 
-	if err := m.recordMigration(ctx, pair.Version, pair.Description, checksum, duration); err != nil {
+	if err := m.recordMigration(ctx, migrationRecord{
+		version:     pair.Version,
+		description: pair.Description,
+		checksum:    checksum,
+		duration:    duration,
+	}); err != nil {
 		return err
 	}
 
@@ -388,6 +385,8 @@ func (m *Migrator) readMigrationContent(version uint64, direction Direction) ([]
 		reader, err = m.source.ReadUp(version)
 	case Down:
 		reader, err = m.source.ReadDown(version)
+	default:
+		return nil, fmt.Errorf("unsupported migration direction: %s", direction)
 	}
 
 	if err != nil {
@@ -429,7 +428,7 @@ func (m *Migrator) executeStatements(ctx context.Context, version uint64, direct
 
 // parseStatements splits migration content into individual CQL statements.
 // Statements are separated by semicolons. Lines starting with -- are comments.
-func (m *Migrator) parseStatements(content string) []string {
+func (*Migrator) parseStatements(content string) []string {
 	var statements []string
 	var current strings.Builder
 
@@ -438,7 +437,7 @@ func (m *Migrator) parseStatements(content string) []string {
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
-		// Skip empty lines and comments
+		// Skip empty lines and comments.
 		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
 			continue
 		}
@@ -446,10 +445,10 @@ func (m *Migrator) parseStatements(content string) []string {
 		current.WriteString(line)
 		current.WriteString("\n")
 
-		// Check if line ends with semicolon
+		// Check if line ends with semicolon.
 		if strings.HasSuffix(trimmed, ";") {
 			stmt := strings.TrimSpace(current.String())
-			// Remove trailing semicolon for gocql
+			// Remove trailing semicolon for gocql.
 			stmt = strings.TrimSuffix(stmt, ";")
 			stmt = strings.TrimSpace(stmt)
 			if stmt != "" {
@@ -459,7 +458,7 @@ func (m *Migrator) parseStatements(content string) []string {
 		}
 	}
 
-	// Handle case where last statement doesn't end with semicolon
+	// Handle case where last statement doesn't end with semicolon.
 	remaining := strings.TrimSpace(current.String())
 	if remaining != "" {
 		statements = append(statements, remaining)
@@ -468,9 +467,9 @@ func (m *Migrator) parseStatements(content string) []string {
 	return statements
 }
 
-// checksum calculates MD5 checksum of migration content.
-func (m *Migrator) checksum(content []byte) string {
-	hash := md5.Sum(content)
+// checksum calculates a SHA-256 checksum of migration content.
+func (*Migrator) checksum(content []byte) string {
+	hash := sha256.Sum256(content)
 	return hex.EncodeToString(hash[:])
 }
 

@@ -2,8 +2,11 @@ package scyllamigrate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/gocql/gocql"
 )
 
 const historySchemaTemplate = `
@@ -15,6 +18,13 @@ CREATE TABLE IF NOT EXISTS %s.%s (
     execution_ms bigint,
     PRIMARY KEY (version)
 )`
+
+type migrationRecord struct {
+	version     uint64
+	description string
+	checksum    string
+	duration    time.Duration
+}
 
 // ensureHistoryTable creates the migration history table if it doesn't exist.
 func (m *Migrator) ensureHistoryTable(ctx context.Context) error {
@@ -34,22 +44,20 @@ func (m *Migrator) ensureHistoryTable(ctx context.Context) error {
 }
 
 // recordMigration records a successfully applied migration to the history table.
-func (m *Migrator) recordMigration(ctx context.Context, version uint64, description, checksum string, duration time.Duration) error {
+func (m *Migrator) recordMigration(ctx context.Context, record migrationRecord) error {
 	query := fmt.Sprintf(
 		"INSERT INTO %s.%s (version, description, checksum, applied_at, execution_ms) VALUES (?, ?, ?, ?, ?)",
 		m.keyspace, m.historyTable,
 	)
 
-	err := m.session.Query(query,
-		version,
-		description,
-		checksum,
+	if err := m.session.Query(query,
+		record.version,
+		record.description,
+		record.checksum,
 		time.Now(),
-		duration.Milliseconds(),
-	).WithContext(ctx).Consistency(m.consistency).Exec()
-
-	if err != nil {
-		return fmt.Errorf("failed to record migration %d: %w", version, err)
+		record.duration.Milliseconds(),
+	).WithContext(ctx).Consistency(m.consistency).Exec(); err != nil {
+		return fmt.Errorf("failed to record migration %d: %w", record.version, err)
 	}
 
 	return nil
@@ -62,8 +70,7 @@ func (m *Migrator) removeMigration(ctx context.Context, version uint64) error {
 		m.keyspace, m.historyTable,
 	)
 
-	err := m.session.Query(query, version).WithContext(ctx).Consistency(m.consistency).Exec()
-	if err != nil {
+	if err := m.session.Query(query, version).WithContext(ctx).Consistency(m.consistency).Exec(); err != nil {
 		return fmt.Errorf("failed to remove migration record %d: %w", version, err)
 	}
 
@@ -79,11 +86,13 @@ func (m *Migrator) getAppliedMigrations(ctx context.Context) ([]*AppliedMigratio
 
 	iter := m.session.Query(query).WithContext(ctx).Consistency(m.consistency).Iter()
 
-	var migrations []*AppliedMigration
-	var version uint64
-	var description, checksum string
-	var appliedAt time.Time
-	var executionMs int64
+	var (
+		migrations            []*AppliedMigration
+		version               uint64
+		description, checksum string
+		appliedAt             time.Time
+		executionMs           int64
+	)
 
 	for iter.Scan(&version, &description, &checksum, &appliedAt, &executionMs) {
 		migrations = append(migrations, &AppliedMigration{
@@ -136,7 +145,7 @@ func (m *Migrator) getAppliedVersions(ctx context.Context) (map[uint64]bool, err
 }
 
 // historyTableExists checks if the history table exists.
-func (m *Migrator) historyTableExists(ctx context.Context) (bool, error) {
+func (m *Migrator) historyTableExists(ctx context.Context) bool {
 	query := `
 		SELECT table_name
 		FROM system_schema.tables
@@ -144,15 +153,16 @@ func (m *Migrator) historyTableExists(ctx context.Context) (bool, error) {
 	`
 
 	var tableName string
-	err := m.session.Query(query, m.keyspace, m.historyTable).
+
+	if err := m.session.Query(query, m.keyspace, m.historyTable).
 		WithContext(ctx).
 		Consistency(m.consistency).
-		Scan(&tableName)
-
-	if err != nil {
-		// Table doesn't exist
-		return false, nil
+		Scan(&tableName); err != nil {
+		if errors.Is(err, gocql.ErrNotFound) {
+			return false
+		}
+		return false
 	}
 
-	return true, nil
+	return true
 }
