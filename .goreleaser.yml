@@ -85,13 +85,13 @@ brews:
       owner: heartwilltell
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
+    directory: brew
     homepage: "https://github.com/heartwilltell/scyllamigrate"
     description: "A lightweight schema migration tool for ScyllaDB"
     license: "MIT"
     commit_author:
-      name: goreleaserbot
-      email: bot@goreleaser.com
+      name: Serhii Mariiekha
+      email: heartwilltell@gmail.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
     install: |
       bin.install "scyllamigrate"
