@@ -37,4 +37,4 @@ USER appuser
 WORKDIR /migrations
 
 ENTRYPOINT ["scyllamigrate"]
-CMD ["--help"]
+CMD ["-help"]

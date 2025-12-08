@@ -306,7 +306,7 @@ func versionCmd() *scotty.Command {
 // Returns a managed migrator with a cleanup hook.
 func createMigrator() (*managedMigrator, error) {
 	if cfg.keyspace == "" {
-		return nil, errors.New("keyspace is required (use --keyspace or SCYLLA_KEYSPACE)")
+		return nil, errors.New("keyspace is required (use -keyspace or SCYLLA_KEYSPACE)")
 	}
 
 	// Parse hosts.

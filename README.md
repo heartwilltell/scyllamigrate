@@ -64,13 +64,13 @@ DROP TABLE IF EXISTS users;
 
 ```bash
 # Apply all pending migrations
-scyllamigrate up --hosts=localhost:9042 --keyspace=myapp --dir=./migrations
+scyllamigrate up -hosts=localhost:9042 -keyspace=myapp -dir=./migrations
 
 # Check migration status
-scyllamigrate status --hosts=localhost:9042 --keyspace=myapp
+scyllamigrate status -hosts=localhost:9042 -keyspace=myapp
 
 # Rollback the last migration
-scyllamigrate down --hosts=localhost:9042 --keyspace=myapp
+scyllamigrate down -hosts=localhost:9042 -keyspace=myapp
 ```
 
 #### Using the Go API
@@ -190,12 +190,12 @@ Migration files must follow this naming pattern:
 
 | Flag | Environment Variable | Default | Description |
 |------|---------------------|---------|-------------|
-| `--hosts` | `SCYLLA_HOSTS` | `localhost:9042` | Comma-separated list of ScyllaDB hosts |
-| `--keyspace` | `SCYLLA_KEYSPACE` | (required) | Target keyspace |
-| `--dir` | `MIGRATIONS_DIR` | `./migrations` | Migrations directory |
-| `--consistency` | `SCYLLA_CONSISTENCY` | `quorum` | Consistency level |
-| `--timeout` | `SCYLLA_TIMEOUT` | `30s` | Operation timeout |
-| `--table` | `SCYLLA_MIGRATIONS_TABLE` | `schema_migrations` | Migration history table name |
+| `-hosts` | `SCYLLA_HOSTS` | `localhost:9042` | Comma-separated list of ScyllaDB hosts |
+| `-keyspace` | `SCYLLA_KEYSPACE` | (required) | Target keyspace |
+| `-dir` | `MIGRATIONS_DIR` | `./migrations` | Migrations directory |
+| `-consistency` | `SCYLLA_CONSISTENCY` | `quorum` | Consistency level |
+| `-timeout` | `SCYLLA_TIMEOUT` | `30s` | Operation timeout |
+| `-table` | `SCYLLA_MIGRATIONS_TABLE` | `schema_migrations` | Migration history table name |
 
 ### Commands
 
@@ -205,10 +205,10 @@ Apply all pending migrations or a specific number:
 
 ```bash
 # Apply all pending migrations
-scyllamigrate up --keyspace=myapp
+scyllamigrate up -keyspace=myapp
 
 # Apply next 3 migrations
-scyllamigrate up -n 3 --keyspace=myapp
+scyllamigrate up -n 3 -keyspace=myapp
 ```
 
 #### `down` - Rollback Migrations
@@ -217,10 +217,10 @@ Rollback the last migration or a specific number:
 
 ```bash
 # Rollback the last migration
-scyllamigrate down --keyspace=myapp
+scyllamigrate down -keyspace=myapp
 
 # Rollback last 3 migrations
-scyllamigrate down -n 3 --keyspace=myapp
+scyllamigrate down -n 3 -keyspace=myapp
 ```
 
 #### `status` - Show Migration Status
@@ -228,7 +228,7 @@ scyllamigrate down -n 3 --keyspace=myapp
 Display applied and pending migrations:
 
 ```bash
-scyllamigrate status --keyspace=myapp
+scyllamigrate status -keyspace=myapp
 ```
 
 Output:
@@ -251,10 +251,10 @@ Generate a new migration file pair:
 
 ```bash
 # Create with .cql extension (default)
-scyllamigrate create add_comments_table --dir=./migrations
+scyllamigrate create add_comments_table -dir=./migrations
 
 # Create with .sql extension
-scyllamigrate create add_comments_table --ext=sql --dir=./migrations
+scyllamigrate create add_comments_table -ext=sql -dir=./migrations
 ```
 
 This creates:
@@ -269,7 +269,7 @@ migrations/000004_add_comments_table.down.cql
 Display the current migration version:
 
 ```bash
-scyllamigrate version --keyspace=myapp
+scyllamigrate version -keyspace=myapp
 ```
 
 ## Programmatic API
@@ -446,15 +446,15 @@ Even if you don't plan to rollback, having down migrations helps with:
 
 ```bash
 # Apply migrations
-scyllamigrate up --keyspace=myapp_test
+scyllamigrate up -keyspace=myapp_test
 
 # Verify state
 
 # Rollback all
-scyllamigrate down -n 100 --keyspace=myapp_test
+scyllamigrate down -n 100 -keyspace=myapp_test
 
 # Apply again to verify idempotency
-scyllamigrate up --keyspace=myapp_test
+scyllamigrate up -keyspace=myapp_test
 ```
 
 ### 5. Use Environment Variables in Production

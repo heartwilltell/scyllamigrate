@@ -41,6 +41,6 @@ class Scyllamigrate < Formula
   end
 
   test do
-    system "#{bin}/scyllamigrate", "--help"
+    system "#{bin}/scyllamigrate", "-help"
   end
 end
