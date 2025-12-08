@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -ldflags="-s -w" -o scyllamigrate-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/scyllamigrate
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scyllamigrate-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: scyllamigrate-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    services:
+      scylla:
+        image: scylladb/scylla:latest
+        ports:
+          - 9042:9042
+        options: >-
+          --health-cmd "cqlsh -e 'SELECT now() FROM system.local'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Wait for ScyllaDB
+        run: |
+          for i in {1..30}; do
+            if docker exec $(docker ps -q -f "ancestor=scylladb/scylla:latest") cqlsh -e "SELECT now() FROM system.local" 2>/dev/null; then
+              echo "ScyllaDB is ready"
+              break
+            fi
+            echo "Waiting for ScyllaDB... ($i/30)"
+            sleep 2
+          done
+
+      - name: Create test keyspace
+        run: |
+          docker exec $(docker ps -q -f "ancestor=scylladb/scylla:latest") cqlsh -e "
+            CREATE KEYSPACE IF NOT EXISTS test_migrations
+            WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+          "
+
+      - name: Run integration tests
+        env:
+          SCYLLA_HOSTS: localhost:9042
+          SCYLLA_KEYSPACE: test_migrations
+        run: go test -v -tags=integration ./...

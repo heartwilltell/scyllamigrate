@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+dist/
+*.exe
+scyllamigrate
+
+# Test files
+*_test.go
+testdata/
+coverage.out
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github/
+.goreleaser.yml
+
+# Homebrew
+Formula/
+
+# Docker
+Dockerfile
+.dockerignore
