@@ -10,7 +10,7 @@ before:
 
 builds:
   - id: scyllamigrate
-    main: ./cmd/scyllamigrate
+    main: ./cmd
     binary: scyllamigrate
     env:
       - CGO_ENABLED=0
