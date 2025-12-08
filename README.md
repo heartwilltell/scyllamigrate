@@ -79,6 +79,7 @@ package main
 import (
     "context"
     "log"
+    "log/slog"
 
     "github.com/gocql/gocql"
     "github.com/heartwilltell/scyllamigrate"
@@ -98,6 +99,7 @@ func main() {
     migrator, err := scyllamigrate.New(session,
         scyllamigrate.WithDir("./migrations"),
         scyllamigrate.WithKeyspace("myapp"),
+        scyllamigrate.WithLogger(slog.Default()), // Optional: progress logging
     )
     if err != nil {
         log.Fatal(err)
@@ -281,7 +283,7 @@ migrator, err := scyllamigrate.New(session,
     scyllamigrate.WithKeyspace("myapp"),             // Required: target keyspace
     scyllamigrate.WithHistoryTable("migrations"),    // Optional: custom table name
     scyllamigrate.WithConsistency(gocql.Quorum),     // Optional: consistency level
-    scyllamigrate.WithLogger(logger),                // Optional: progress logging
+    scyllamigrate.WithLogger(slog.Default()),        // Optional: progress logging (slog.Logger)
     scyllamigrate.WithSchemaAgreement(true),         // Optional: wait for schema agreement
 )
 ```

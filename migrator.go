@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ type Migrator struct {
 	source                 Source
 	keyspace               string
 	historyTable           string
-	logger                 Logger
+	logger                 *slog.Logger
 	consistency            gocql.Consistency
 	waitForSchemaAgreement bool
 	schemaAgreementTimeout int
@@ -476,6 +477,6 @@ func (*Migrator) checksum(content []byte) string {
 // log logs a message if a logger is configured.
 func (m *Migrator) log(format string, v ...any) {
 	if m.logger != nil {
-		m.logger.Printf(format, v...)
+		m.logger.Info(fmt.Sprintf(format, v...))
 	}
 }

@@ -84,7 +84,10 @@ func (m *Migrator) getAppliedMigrations(ctx context.Context) ([]*AppliedMigratio
 		m.keyspace, m.historyTable,
 	)
 
-	iter := m.session.Query(query).WithContext(ctx).Consistency(m.consistency).Iter()
+	iter := m.session.Query(query).
+		WithContext(ctx).
+		Consistency(m.consistency).
+		Iter()
 
 	var (
 		migrations            []*AppliedMigration
@@ -120,6 +123,7 @@ func (m *Migrator) getLatestVersion(ctx context.Context) (uint64, error) {
 	}
 
 	var maxVersion uint64
+
 	for _, am := range applied {
 		if am.Version > maxVersion {
 			maxVersion = am.Version
@@ -137,6 +141,7 @@ func (m *Migrator) getAppliedVersions(ctx context.Context) (map[uint64]bool, err
 	}
 
 	versions := make(map[uint64]bool, len(applied))
+
 	for _, am := range applied {
 		versions[am.Version] = true
 	}
@@ -161,6 +166,7 @@ func (m *Migrator) historyTableExists(ctx context.Context) bool {
 		if errors.Is(err, gocql.ErrNotFound) {
 			return false
 		}
+
 		return false
 	}
 
