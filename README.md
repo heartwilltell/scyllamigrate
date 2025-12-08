@@ -233,7 +233,7 @@ scyllamigrate status --keyspace=myapp
 
 Output:
 
-```
+```text
 Current Version: 3
 
 Applied Migrations:
