@@ -39,6 +39,7 @@ mkdir migrations
 ```
 
 **migrations/000001_create_users.up.cql**
+
 ```cql
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
@@ -51,6 +52,7 @@ CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
 ```
 
 **migrations/000001_create_users.down.cql**
+
 ```cql
 DROP INDEX IF EXISTS users_email_idx;
 DROP TABLE IF EXISTS users;
@@ -164,7 +166,7 @@ func main() {
 
 Migration files must follow this naming pattern:
 
-```
+```text
 {version}_{description}.{direction}.{extension}
 ```
 
@@ -175,7 +177,7 @@ Migration files must follow this naming pattern:
 
 ### Examples
 
-```
+```text
 000001_create_users.up.cql
 000001_create_users.down.cql
 000002_add_email_index.up.sql
@@ -230,6 +232,7 @@ scyllamigrate status --keyspace=myapp
 ```
 
 Output:
+
 ```
 Current Version: 3
 
@@ -255,7 +258,8 @@ scyllamigrate create add_comments_table --ext=sql --dir=./migrations
 ```
 
 This creates:
-```
+
+```text
 migrations/000004_add_comments_table.up.cql
 migrations/000004_add_comments_table.down.cql
 ```
@@ -433,6 +437,7 @@ Each migration should do one thing:
 ### 3. Always Provide Down Migrations
 
 Even if you don't plan to rollback, having down migrations helps with:
+
 - Development and testing
 - Disaster recovery
 - Schema verification

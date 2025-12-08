@@ -12,7 +12,7 @@ type Direction string
 const (
 	// Up represents a forward migration.
 	Up Direction = "up"
-	
+
 	// Down represents a rollback migration.
 	Down Direction = "down"
 )
