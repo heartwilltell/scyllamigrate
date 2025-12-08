@@ -78,6 +78,7 @@ func WithStdLogger(l *log.Logger) Option {
 			m.logger = nil
 			return nil
 		}
+
 		m.logger = slog.New(&logHandler{logger: l})
 		return nil
 	}
@@ -88,11 +89,11 @@ type logHandler struct {
 	logger *log.Logger
 }
 
-func (h *logHandler) Enabled(_ context.Context, _ slog.Level) bool {
+func (*logHandler) Enabled(_ context.Context, _ slog.Level) bool {
 	return true
 }
 
-func (h *logHandler) Handle(_ context.Context, _ slog.Record) error {
+func (*logHandler) Handle(_ context.Context, _ slog.Record) error {
 	// This method is not used since we use LogAttrs.
 	return nil
 }

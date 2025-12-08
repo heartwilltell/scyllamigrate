@@ -8,18 +8,17 @@ import (
 )
 
 func TestNewFSSource(t *testing.T) {
-	tests := []struct {
-		name      string
+	type tcase struct {
 		files     map[string]string
 		wantErr   bool
 		checkFunc func(*testing.T, *FSSource, error)
-	}{
-		{
-			name: "valid migrations",
+	}
+	tests := map[string]tcase{
+		"valid migrations": {
 			files: map[string]string{
 				"000001_create_users.up.cql":   "CREATE TABLE users;",
 				"000001_create_users.down.cql": "DROP TABLE users;",
-				"000002_add_index.up.cql":     "CREATE INDEX idx ON users;",
+				"000002_add_index.up.cql":      "CREATE INDEX idx ON users;",
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
@@ -38,11 +37,10 @@ func TestNewFSSource(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "only up migrations",
+		"only up migrations": {
 			files: map[string]string{
 				"000001_create_users.up.cql": "CREATE TABLE users;",
-				"000002_add_index.up.cql":   "CREATE INDEX idx ON users;",
+				"000002_add_index.up.cql":    "CREATE INDEX idx ON users;",
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
@@ -60,8 +58,7 @@ func TestNewFSSource(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "mixed extensions",
+		"mixed extensions": {
 			files: map[string]string{
 				"000001_create_users.up.cql":   "CREATE TABLE users;",
 				"000001_create_users.down.sql": "DROP TABLE users;",
@@ -73,12 +70,11 @@ func TestNewFSSource(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "non-migration files ignored",
+		"non-migration files ignored": {
 			files: map[string]string{
 				"000001_create_users.up.cql": "CREATE TABLE users;",
 				"README.md":                  "# Documentation",
-				"config.yaml":                 "config: value",
+				"config.yaml":                "config: value",
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
@@ -91,8 +87,7 @@ func TestNewFSSource(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "invalid migration filename ignored",
+		"invalid migration filename ignored": {
 			files: map[string]string{
 				"invalid_file.cql": "CREATE TABLE users;",
 			},
@@ -107,8 +102,7 @@ func TestNewFSSource(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:    "empty filesystem",
+		"empty filesystem": {
 			files:   map[string]string{},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
@@ -123,11 +117,11 @@ func TestNewFSSource(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			fsys := fstest.MapFS{}
-			for name, content := range tt.files {
-				fsys[name] = &fstest.MapFile{
+			for fileName, content := range tt.files {
+				fsys[fileName] = &fstest.MapFile{
 					Data: []byte(content),
 				}
 			}
@@ -149,8 +143,8 @@ func TestFSSource_List(t *testing.T) {
 		"000001_create_users.up.cql":   {Data: []byte("CREATE TABLE users;")},
 		"000001_create_users.down.cql": {Data: []byte("DROP TABLE users;")},
 		"000002_add_index.up.cql":      {Data: []byte("CREATE INDEX idx;")},
-		"000002_add_index.down.cql":     {Data: []byte("DROP INDEX idx;")},
-		"000003_final.up.cql":           {Data: []byte("ALTER TABLE users;")},
+		"000002_add_index.down.cql":    {Data: []byte("DROP INDEX idx;")},
+		"000003_final.up.cql":          {Data: []byte("ALTER TABLE users;")},
 	}
 
 	source, err := NewFSSource(fsys)
@@ -194,14 +188,13 @@ func TestFSSource_ReadUp(t *testing.T) {
 		t.Fatalf("NewFSSource() error = %v", err)
 	}
 
-	tests := []struct {
-		name      string
+	type tcase struct {
 		version   uint64
 		wantErr   bool
 		checkFunc func(*testing.T, io.ReadCloser, error)
-	}{
-		{
-			name:    "valid version",
+	}
+	tests := map[string]tcase{
+		"valid version": {
 			version: 1,
 			wantErr: false,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
@@ -221,8 +214,7 @@ func TestFSSource_ReadUp(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:    "version not found",
+		"version not found": {
 			version: 999,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
@@ -234,8 +226,7 @@ func TestFSSource_ReadUp(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:    "up migration missing",
+		"up migration missing": {
 			version: 2,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
@@ -249,8 +240,8 @@ func TestFSSource_ReadUp(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			r, err := source.ReadUp(tt.version)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadUp() error = %v, wantErr %v", err, tt.wantErr)
@@ -277,14 +268,13 @@ func TestFSSource_ReadDown(t *testing.T) {
 		t.Fatalf("NewFSSource() error = %v", err)
 	}
 
-	tests := []struct {
-		name      string
+	type tcase struct {
 		version   uint64
 		wantErr   bool
 		checkFunc func(*testing.T, io.ReadCloser, error)
-	}{
-		{
-			name:    "valid version",
+	}
+	tests := map[string]tcase{
+		"valid version": {
 			version: 1,
 			wantErr: false,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
@@ -304,8 +294,7 @@ func TestFSSource_ReadDown(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:    "version not found",
+		"version not found": {
 			version: 999,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
@@ -314,8 +303,7 @@ func TestFSSource_ReadDown(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:    "down migration missing",
+		"down migration missing": {
 			version: 2,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
@@ -326,8 +314,8 @@ func TestFSSource_ReadDown(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			r, err := source.ReadDown(tt.version)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadDown() error = %v, wantErr %v", err, tt.wantErr)
@@ -375,25 +363,23 @@ func TestFSSource_Get(t *testing.T) {
 		t.Fatalf("NewFSSource() error = %v", err)
 	}
 
-	tests := []struct {
-		name    string
+	type tcase struct {
 		version uint64
 		want    bool
-	}{
-		{
-			name:    "existing version",
+	}
+	tests := map[string]tcase{
+		"existing version": {
 			version: 1,
 			want:    true,
 		},
-		{
-			name:    "non-existent version",
+		"non-existent version": {
 			version: 999,
 			want:    false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			pair, got := source.Get(tt.version)
 			if got != tt.want {
 				t.Errorf("Get() = %v, want %v", got, tt.want)
@@ -410,9 +396,9 @@ func TestFSSource_Get(t *testing.T) {
 
 func TestFSSource_Versions(t *testing.T) {
 	fsys := fstest.MapFS{
-		"000003_final.up.cql":           {Data: []byte("ALTER TABLE users;")},
-		"000001_create_users.up.cql":   {Data: []byte("CREATE TABLE users;")},
-		"000002_add_index.up.cql":      {Data: []byte("CREATE INDEX idx;")},
+		"000003_final.up.cql":        {Data: []byte("ALTER TABLE users;")},
+		"000001_create_users.up.cql": {Data: []byte("CREATE TABLE users;")},
+		"000002_add_index.up.cql":    {Data: []byte("CREATE INDEX idx;")},
 	}
 
 	source, err := NewFSSource(fsys)
@@ -486,4 +472,3 @@ func TestFSSource_scanWithDirectories(t *testing.T) {
 		t.Errorf("List() returned %d pairs, want 1 (directories should be ignored)", len(pairs))
 	}
 }
-

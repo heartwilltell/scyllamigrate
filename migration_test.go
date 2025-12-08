@@ -5,35 +5,31 @@ import (
 )
 
 func TestDirection_String(t *testing.T) {
-	tests := []struct {
-		name     string
+	type tcase struct {
 		d        Direction
 		expected string
-	}{
-		{
-			name:     "Up direction",
+	}
+	tests := map[string]tcase{
+		"Up direction": {
 			d:        Up,
 			expected: "up",
 		},
-		{
-			name:     "Down direction",
+		"Down direction": {
 			d:        Down,
 			expected: "down",
 		},
-		{
-			name:     "Empty direction",
+		"Empty direction": {
 			d:        Direction(""),
 			expected: "",
 		},
-		{
-			name:     "Custom direction",
+		"Custom direction": {
 			d:        Direction("custom"),
 			expected: "custom",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := tt.d.String(); got != tt.expected {
 				t.Errorf("String() = %q, want %q", got, tt.expected)
 			}
@@ -42,14 +38,13 @@ func TestDirection_String(t *testing.T) {
 }
 
 func TestParseMigration(t *testing.T) {
-	tests := []struct {
-		name      string
+	type tcase struct {
 		filename  string
 		wantErr   bool
 		checkFunc func(*testing.T, *Migration, error)
-	}{
-		{
-			name:     "valid up migration with cql extension",
+	}
+	tests := map[string]tcase{
+		"valid up migration with cql extension": {
 			filename: "000001_create_users.up.cql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
@@ -70,8 +65,7 @@ func TestParseMigration(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:     "valid down migration with sql extension",
+		"valid down migration with sql extension": {
 			filename: "000001_create_users.down.sql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
@@ -89,8 +83,7 @@ func TestParseMigration(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:     "valid migration with multi-word description",
+		"valid migration with multi-word description": {
 			filename: "000042_add_user_profile_table.up.cql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
@@ -105,8 +98,7 @@ func TestParseMigration(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:     "valid migration with single digit version",
+		"valid migration with single digit version": {
 			filename: "1_initial.up.cql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
@@ -118,8 +110,7 @@ func TestParseMigration(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:     "valid migration with large version number",
+		"valid migration with large version number": {
 			filename: "999999_final_migration.up.cql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
@@ -131,10 +122,9 @@ func TestParseMigration(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:    "invalid - missing version",
+		"invalid - missing version": {
 			filename: "_create_users.up.cql",
-			wantErr: true,
+			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
 				if err == nil {
 					t.Fatal("ParseMigration() error = nil, want error")
@@ -144,60 +134,54 @@ func TestParseMigration(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:    "invalid - missing description",
+		"invalid - missing description": {
 			filename: "000001.up.cql",
-			wantErr: true,
+			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
 				if err == nil {
 					t.Fatal("ParseMigration() error = nil, want error")
 				}
 			},
 		},
-		{
-			name:    "invalid - wrong direction",
+		"invalid - wrong direction": {
 			filename: "000001_create_users.sideways.cql",
-			wantErr: true,
+			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
 				if err == nil {
 					t.Fatal("ParseMigration() error = nil, want error")
 				}
 			},
 		},
-		{
-			name:    "invalid - wrong extension",
+		"invalid - wrong extension": {
 			filename: "000001_create_users.up.txt",
-			wantErr: true,
+			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
 				if err == nil {
 					t.Fatal("ParseMigration() error = nil, want error")
 				}
 			},
 		},
-		{
-			name:    "invalid - missing extension",
+		"invalid - missing extension": {
 			filename: "000001_create_users.up",
-			wantErr: true,
+			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
 				if err == nil {
 					t.Fatal("ParseMigration() error = nil, want error")
 				}
 			},
 		},
-		{
-			name:    "invalid - empty filename",
+		"invalid - empty filename": {
 			filename: "",
-			wantErr: true,
+			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
 				if err == nil {
 					t.Fatal("ParseMigration() error = nil, want error")
 				}
 			},
 		},
-		{
-			name:    "invalid - no underscores",
+		"invalid - no underscores": {
 			filename: "000001createusers.up.cql",
-			wantErr: true,
+			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
 				if err == nil {
 					t.Fatal("ParseMigration() error = nil, want error")
@@ -206,8 +190,8 @@ func TestParseMigration(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			got, err := ParseMigration(tt.filename)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseMigration() error = %v, wantErr %v", err, tt.wantErr)
@@ -221,65 +205,55 @@ func TestParseMigration(t *testing.T) {
 }
 
 func TestIsMigrationFile(t *testing.T) {
-	tests := []struct {
-		name     string
+	type tcase struct {
 		filename string
 		want     bool
-	}{
-		{
-			name:     "valid up migration cql",
+	}
+	tests := map[string]tcase{
+		"valid up migration cql": {
 			filename: "000001_create_users.up.cql",
 			want:     true,
 		},
-		{
-			name:     "valid down migration sql",
+		"valid down migration sql": {
 			filename: "000001_create_users.down.sql",
 			want:     true,
 		},
-		{
-			name:     "valid single digit version",
+		"valid single digit version": {
 			filename: "1_initial.up.cql",
 			want:     true,
 		},
-		{
-			name:     "invalid - missing version",
+		"invalid - missing version": {
 			filename: "_create_users.up.cql",
 			want:     false,
 		},
-		{
-			name:     "invalid - wrong extension",
+		"invalid - wrong extension": {
 			filename: "000001_create_users.up.txt",
 			want:     false,
 		},
-		{
-			name:     "invalid - wrong direction",
+		"invalid - wrong direction": {
 			filename: "000001_create_users.sideways.cql",
 			want:     false,
 		},
-		{
-			name:     "invalid - empty filename",
+		"invalid - empty filename": {
 			filename: "",
 			want:     false,
 		},
-		{
-			name:     "invalid - regular file",
+		"invalid - regular file": {
 			filename: "README.md",
 			want:     false,
 		},
-		{
-			name:     "invalid - no extension",
+		"invalid - no extension": {
 			filename: "000001_create_users.up",
 			want:     false,
 		},
-		{
-			name:     "valid with underscores in description",
+		"valid with underscores in description": {
 			filename: "000001_add_user_profile_table.up.cql",
 			want:     true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := IsMigrationFile(tt.filename); got != tt.want {
 				t.Errorf("IsMigrationFile(%q) = %v, want %v", tt.filename, got, tt.want)
 			}
@@ -288,36 +262,33 @@ func TestIsMigrationFile(t *testing.T) {
 }
 
 func TestMigrationPair_HasUp(t *testing.T) {
-	tests := []struct {
-		name string
+	type tcase struct {
 		pair *MigrationPair
 		want bool
-	}{
-		{
-			name: "has up migration",
+	}
+	tests := map[string]tcase{
+		"has up migration": {
 			pair: &MigrationPair{
 				Version: 1,
 				Up:      &Migration{Version: 1, Direction: Up},
 			},
 			want: true,
 		},
-		{
-			name: "no up migration",
+		"no up migration": {
 			pair: &MigrationPair{
 				Version: 1,
 				Up:      nil,
 			},
 			want: false,
 		},
-		{
-			name: "empty pair",
+		"empty pair": {
 			pair: &MigrationPair{},
 			want: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := tt.pair.HasUp(); got != tt.want {
 				t.Errorf("HasUp() = %v, want %v", got, tt.want)
 			}
@@ -326,40 +297,36 @@ func TestMigrationPair_HasUp(t *testing.T) {
 }
 
 func TestMigrationPair_HasDown(t *testing.T) {
-	tests := []struct {
-		name string
+	type tcase struct {
 		pair *MigrationPair
 		want bool
-	}{
-		{
-			name: "has down migration",
+	}
+	tests := map[string]tcase{
+		"has down migration": {
 			pair: &MigrationPair{
 				Version: 1,
 				Down:    &Migration{Version: 1, Direction: Down},
 			},
 			want: true,
 		},
-		{
-			name: "no down migration",
+		"no down migration": {
 			pair: &MigrationPair{
 				Version: 1,
 				Down:    nil,
 			},
 			want: false,
 		},
-		{
-			name: "empty pair",
+		"empty pair": {
 			pair: &MigrationPair{},
 			want: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := tt.pair.HasDown(); got != tt.want {
 				t.Errorf("HasDown() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
-

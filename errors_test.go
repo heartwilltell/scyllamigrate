@@ -7,60 +7,51 @@ import (
 )
 
 func TestError_Error(t *testing.T) {
-	tests := []struct {
-		name     string
+	type tcase struct {
 		err      Error
 		expected string
-	}{
-		{
-			name:     "ErrNoSource",
+	}
+	tests := map[string]tcase{
+		"ErrNoSource": {
 			err:      ErrNoSource,
 			expected: "scyllamigrate: no migration source configured",
 		},
-		{
-			name:     "ErrNoChange",
+		"ErrNoChange": {
 			err:      ErrNoChange,
 			expected: "scyllamigrate: no migrations to apply",
 		},
-		{
-			name:     "ErrMissingDown",
+		"ErrMissingDown": {
 			err:      ErrMissingDown,
 			expected: "scyllamigrate: down migration not found",
 		},
-		{
-			name:     "ErrMissingUp",
+		"ErrMissingUp": {
 			err:      ErrMissingUp,
 			expected: "scyllamigrate: up migration not found",
 		},
-		{
-			name:     "ErrMissingVersion",
+		"ErrMissingVersion": {
 			err:      ErrMissingVersion,
 			expected: "scyllamigrate: migration version not found",
 		},
-		{
-			name:     "ErrChecksumMismatch",
+		"ErrChecksumMismatch": {
 			err:      ErrChecksumMismatch,
 			expected: "scyllamigrate: migration file was modified after being applied",
 		},
-		{
-			name:     "ErrVersionNotFound",
+		"ErrVersionNotFound": {
 			err:      ErrVersionNotFound,
 			expected: "scyllamigrate: migration version not found",
 		},
-		{
-			name:     "ErrNoKeyspace",
+		"ErrNoKeyspace": {
 			err:      ErrNoKeyspace,
 			expected: "scyllamigrate: no keyspace configured",
 		},
-		{
-			name:     "ErrNoSession",
+		"ErrNoSession": {
 			err:      ErrNoSession,
 			expected: "scyllamigrate: no database session provided",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := tt.err.Error(); got != tt.expected {
 				t.Errorf("Error() = %q, want %q", got, tt.expected)
 			}
@@ -69,46 +60,41 @@ func TestError_Error(t *testing.T) {
 }
 
 func TestError_Is(t *testing.T) {
-	tests := []struct {
-		name     string
+	type tcase struct {
 		err      error
 		target   error
 		expected bool
-	}{
-		{
-			name:     "ErrNoSource matches itself",
+	}
+	tests := map[string]tcase{
+		"ErrNoSource matches itself": {
 			err:      ErrNoSource,
 			target:   ErrNoSource,
 			expected: true,
 		},
-		{
-			name:     "ErrNoChange matches itself",
+		"ErrNoChange matches itself": {
 			err:      ErrNoChange,
 			target:   ErrNoChange,
 			expected: true,
 		},
-		{
-			name:     "ErrMissingDown matches itself",
+		"ErrMissingDown matches itself": {
 			err:      ErrMissingDown,
 			target:   ErrMissingDown,
 			expected: true,
 		},
-		{
-			name:     "ErrMissingUp matches itself",
+		"ErrMissingUp matches itself": {
 			err:      ErrMissingUp,
 			target:   ErrMissingUp,
 			expected: true,
 		},
-		{
-			name:     "Different errors don't match",
+		"Different errors don't match": {
 			err:      ErrNoSource,
 			target:   ErrNoChange,
 			expected: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := errors.Is(tt.err, tt.target); got != tt.expected {
 				t.Errorf("errors.Is(%v, %v) = %v, want %v", tt.err, tt.target, got, tt.expected)
 			}
@@ -117,21 +103,19 @@ func TestError_Is(t *testing.T) {
 }
 
 func TestParseError_Error(t *testing.T) {
-	tests := []struct {
-		name     string
+	type tcase struct {
 		err      *ParseError
 		expected string
-	}{
-		{
-			name: "with underlying error",
+	}
+	tests := map[string]tcase{
+		"with underlying error": {
 			err: &ParseError{
 				Filename: "invalid_file.cql",
 				Err:      fmt.Errorf("invalid format"),
 			},
 			expected: `scyllamigrate: failed to parse migration filename "invalid_file.cql": invalid format`,
 		},
-		{
-			name: "without underlying error",
+		"without underlying error": {
 			err: &ParseError{
 				Filename: "invalid_file.cql",
 				Err:      nil,
@@ -140,8 +124,8 @@ func TestParseError_Error(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := tt.err.Error(); got != tt.expected {
 				t.Errorf("Error() = %q, want %q", got, tt.expected)
 			}
@@ -171,13 +155,12 @@ func TestParseError_Unwrap(t *testing.T) {
 }
 
 func TestMigrationError_Error(t *testing.T) {
-	tests := []struct {
-		name     string
+	type tcase struct {
 		err      *MigrationError
 		expected string
-	}{
-		{
-			name: "with statement number",
+	}
+	tests := map[string]tcase{
+		"with statement number": {
 			err: &MigrationError{
 				Version:   1,
 				Direction: Up,
@@ -186,8 +169,7 @@ func TestMigrationError_Error(t *testing.T) {
 			},
 			expected: "scyllamigrate: failed to execute up migration 1 (statement 2): syntax error",
 		},
-		{
-			name: "without statement number",
+		"without statement number": {
 			err: &MigrationError{
 				Version:   1,
 				Direction: Up,
@@ -196,8 +178,7 @@ func TestMigrationError_Error(t *testing.T) {
 			},
 			expected: "scyllamigrate: failed to execute up migration 1: syntax error",
 		},
-		{
-			name: "down migration",
+		"down migration": {
 			err: &MigrationError{
 				Version:   5,
 				Direction: Down,
@@ -206,8 +187,7 @@ func TestMigrationError_Error(t *testing.T) {
 			},
 			expected: "scyllamigrate: failed to execute down migration 5: table not found",
 		},
-		{
-			name: "down migration with statement",
+		"down migration with statement": {
 			err: &MigrationError{
 				Version:   5,
 				Direction: Down,
@@ -218,8 +198,8 @@ func TestMigrationError_Error(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := tt.err.Error(); got != tt.expected {
 				t.Errorf("Error() = %q, want %q", got, tt.expected)
 			}
@@ -262,13 +242,12 @@ func TestMigrationError_Is(t *testing.T) {
 }
 
 func TestSourceError_Error(t *testing.T) {
-	tests := []struct {
-		name     string
+	type tcase struct {
 		err      *SourceError
 		expected string
-	}{
-		{
-			name: "read operation",
+	}
+	tests := map[string]tcase{
+		"read operation": {
 			err: &SourceError{
 				Version: 1,
 				Op:      "read",
@@ -276,8 +255,7 @@ func TestSourceError_Error(t *testing.T) {
 			},
 			expected: "scyllamigrate: source error for version 1 (read): file not found",
 		},
-		{
-			name: "scan operation",
+		"scan operation": {
 			err: &SourceError{
 				Version: 5,
 				Op:      "scan",
@@ -285,8 +263,7 @@ func TestSourceError_Error(t *testing.T) {
 			},
 			expected: "scyllamigrate: source error for version 5 (scan): permission denied",
 		},
-		{
-			name: "read up operation",
+		"read up operation": {
 			err: &SourceError{
 				Version: 2,
 				Op:      "read up",
@@ -296,8 +273,8 @@ func TestSourceError_Error(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			if got := tt.err.Error(); got != tt.expected {
 				t.Errorf("Error() = %q, want %q", got, tt.expected)
 			}
