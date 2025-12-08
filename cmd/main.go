@@ -50,28 +50,22 @@ func main() {
 		Short: "ScyllaDB schema migration tool",
 		Long:  "A tool for managing ScyllaDB schema migrations with up/down support.",
 		SetFlags: func(f *scotty.FlagSet) {
-			f.StringVarE(
-				&hosts,
-				"hosts",
-				"SCYLLA_HOSTS",
-				"localhost:9042",
+			f.StringVarE(&cfg.hosts, "hosts", "SCYLLA_HOSTS", "localhost:9042",
 				"Comma-separated list of ScyllaDB hosts",
 			)
-			f.StringVarE(&keyspace, "keyspace", "SCYLLA_KEYSPACE", "", "Target keyspace (required)")
-			f.StringVarE(&dir, "dir", "MIGRATIONS_DIR", "./migrations", "Migrations directory")
-			f.StringVarE(
-				&consistency,
-				"consistency",
-				"SCYLLA_CONSISTENCY",
-				"quorum",
+			f.StringVarE(&cfg.keyspace, "keyspace", "SCYLLA_KEYSPACE", "",
+				"Target keyspace (required)",
+			)
+			f.StringVarE(&cfg.dir, "dir", "MIGRATIONS_DIR", "./migrations",
+				"Migrations directory",
+			)
+			f.StringVarE(&cfg.consistency, "consistency", "SCYLLA_CONSISTENCY", "quorum",
 				"Consistency level (any, one, two, three, quorum, all, local_quorum, each_quorum, local_one)",
 			)
-			f.DurationVarE(&timeout, "timeout", "SCYLLA_TIMEOUT", 30*time.Second, "Operation timeout")
-			f.StringVarE(
-				&table,
-				"table",
-				"SCYLLA_MIGRATIONS_TABLE",
-				"schema_migrations",
+			f.DurationVarE(&cfg.timeout, "timeout", "SCYLLA_TIMEOUT", 30*time.Second,
+				"Operation timeout",
+			)
+			f.StringVarE(&cfg.table, "table", "SCYLLA_MIGRATIONS_TABLE", "schema_migrations",
 				"Migration history table name",
 			)
 		},
@@ -108,7 +102,7 @@ func upCmd() *scotty.Command {
 			}
 			defer migrator.Close()
 
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 			defer cancel()
 
 			var applied int
@@ -152,7 +146,7 @@ func downCmd() *scotty.Command {
 			}
 			defer migrator.Close()
 
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 			defer cancel()
 
 			if err := migrator.Steps(ctx, -steps); err != nil {
@@ -183,7 +177,7 @@ func statusCmd() *scotty.Command {
 			}
 			defer migrator.Close()
 
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 			defer cancel()
 
 			status, err := migrator.Status(ctx)
@@ -241,12 +235,12 @@ func createCmd() *scotty.Command {
 			}
 
 			// Ensure migrations directory exists.
-			if err := os.MkdirAll(dir, migrationsDirMode); err != nil {
+			if err := os.MkdirAll(cfg.dir, migrationsDirMode); err != nil {
 				return fmt.Errorf("failed to create migrations directory: %w", err)
 			}
 
 			// Find the next version number.
-			nextVersion, err := findNextVersion(dir)
+			nextVersion, err := findNextVersion(cfg.dir)
 			if err != nil {
 				return err
 			}
@@ -255,8 +249,8 @@ func createCmd() *scotty.Command {
 			upFile := fmt.Sprintf("%06d_%s.up.%s", nextVersion, name, ext)
 			downFile := fmt.Sprintf("%06d_%s.down.%s", nextVersion, name, ext)
 
-			upPath := filepath.Join(dir, upFile)
-			downPath := filepath.Join(dir, downFile)
+			upPath := filepath.Join(cfg.dir, upFile)
+			downPath := filepath.Join(cfg.dir, downFile)
 
 			// Create up migration file.
 			if err := os.WriteFile(upPath, []byte("-- Migration: "+name+" (up)\n\n"), migrationFileMode); err != nil {
@@ -289,7 +283,7 @@ func versionCmd() *scotty.Command {
 			}
 			defer migrator.Close()
 
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 			defer cancel()
 
 			version, err := migrator.Version(ctx)
@@ -311,21 +305,21 @@ func versionCmd() *scotty.Command {
 // createMigrator creates a new Migrator instance with the configured options.
 // Returns a managed migrator with a cleanup hook.
 func createMigrator() (*managedMigrator, error) {
-	if keyspace == "" {
+	if cfg.keyspace == "" {
 		return nil, errors.New("keyspace is required (use --keyspace or SCYLLA_KEYSPACE)")
 	}
 
 	// Parse hosts.
-	hostList := strings.Split(hosts, ",")
+	hostList := strings.Split(cfg.hosts, ",")
 	for i := range hostList {
 		hostList[i] = strings.TrimSpace(hostList[i])
 	}
 
 	// Create cluster configuration.
 	cluster := gocql.NewCluster(hostList...)
-	cluster.Keyspace = keyspace
-	cluster.Consistency = parseConsistency(consistency)
-	cluster.Timeout = timeout
+	cluster.Keyspace = cfg.keyspace
+	cluster.Consistency = parseConsistency(cfg.consistency)
+	cluster.Timeout = cfg.timeout
 
 	// Create session.
 	session, err := cluster.CreateSession()
@@ -335,10 +329,10 @@ func createMigrator() (*managedMigrator, error) {
 
 	// Create migrator.
 	migrator, err := scyllamigrate.New(session,
-		scyllamigrate.WithDir(dir),
-		scyllamigrate.WithKeyspace(keyspace),
-		scyllamigrate.WithHistoryTable(table),
-		scyllamigrate.WithConsistency(parseConsistency(consistency)),
+		scyllamigrate.WithDir(cfg.dir),
+		scyllamigrate.WithKeyspace(cfg.keyspace),
+		scyllamigrate.WithHistoryTable(cfg.table),
+		scyllamigrate.WithConsistency(parseConsistency(cfg.consistency)),
 		scyllamigrate.WithStdLogger(nil), // Use default logger.
 	)
 	if err != nil {
