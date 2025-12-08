@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /scyllamigrate ./cmd/scyllamigrate
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /scyllamigrate ./cmd
 
 # Final stage
 FROM alpine:3.19
