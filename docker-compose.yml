@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  scylla:
+    image: scylladb/scylla:latest
+    container_name: scyllamigrate-test
+    ports:
+      - "9042:9042"
+    environment:
+      - SCYLLA_DEVELOPER_MODE=1
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'SELECT now() FROM system.local' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    command: --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
+

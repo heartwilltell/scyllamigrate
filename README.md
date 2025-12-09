@@ -495,6 +495,10 @@ CREATE KEYSPACE IF NOT EXISTS myapp
     WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 3};
 ```
 
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
