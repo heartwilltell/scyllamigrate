@@ -25,7 +25,7 @@ linters:
     - unconvert # Remove unnecessary type conversions.
     - unparam # Reports unused function parameters.
     - unused # Checks Go code for unused constants, variables, functions and types.
-
+    - wsl_v5 # Whitespace linter.
   settings:
     dogsled:
       # Checks assignments with too many blank identifiers.

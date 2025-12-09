@@ -81,6 +81,7 @@ func (m *Migrator) Up(ctx context.Context) (int, error) {
 		if err := m.applyUp(ctx, pair); err != nil {
 			return applied, err
 		}
+
 		applied++
 	}
 
@@ -99,13 +100,16 @@ func (m *Migrator) UpTo(ctx context.Context, version uint64) (int, error) {
 	}
 
 	applied := 0
+
 	for _, pair := range pending {
 		if pair.Version > version {
 			break
 		}
+
 		if err := m.applyUp(ctx, pair); err != nil {
 			return applied, err
 		}
+
 		applied++
 	}
 
@@ -134,13 +138,16 @@ func (m *Migrator) DownTo(ctx context.Context, version uint64) (int, error) {
 	})
 
 	rolledBack := 0
+
 	for _, am := range applied {
 		if am.Version <= version {
 			break
 		}
+
 		if err := m.applyDown(ctx, am.Version); err != nil {
 			return rolledBack, err
 		}
+
 		rolledBack++
 	}
 
@@ -283,6 +290,7 @@ func (m *Migrator) Close() error {
 	if m.source != nil {
 		return m.source.Close()
 	}
+
 	return nil
 }
 
@@ -306,9 +314,11 @@ func (m *Migrator) applyUp(ctx context.Context, pair *MigrationPair) error {
 	checksum := m.checksum(content)
 
 	start := time.Now()
+
 	if err := m.executeStatements(ctx, pair.Version, Up, content); err != nil {
 		return err
 	}
+
 	duration := time.Since(start)
 
 	if err := m.recordMigration(ctx, migrationRecord{
@@ -333,6 +343,7 @@ func (m *Migrator) applyDown(ctx context.Context, version uint64) error {
 	}
 
 	var pair *MigrationPair
+
 	for _, p := range pairs {
 		if p.Version == version {
 			pair = p
@@ -364,9 +375,11 @@ func (m *Migrator) applyDown(ctx context.Context, version uint64) error {
 	}
 
 	start := time.Now()
+
 	if err := m.executeStatements(ctx, version, Down, content); err != nil {
 		return err
 	}
+
 	duration := time.Since(start)
 
 	if err := m.removeMigration(ctx, version); err != nil {
@@ -381,6 +394,7 @@ func (m *Migrator) applyDown(ctx context.Context, version uint64) error {
 // readMigrationContent reads the content of a migration file.
 func (m *Migrator) readMigrationContent(version uint64, direction Direction) ([]byte, error) {
 	var reader io.ReadCloser
+
 	var err error
 
 	switch direction {
@@ -395,6 +409,7 @@ func (m *Migrator) readMigrationContent(version uint64, direction Direction) ([]
 	if err != nil {
 		return nil, err
 	}
+
 	defer reader.Close()
 
 	content, err := io.ReadAll(reader)
@@ -433,6 +448,7 @@ func (m *Migrator) executeStatements(ctx context.Context, version uint64, direct
 // Statements are separated by semicolons. Lines starting with -- are comments.
 func (*Migrator) parseStatements(content string) []string {
 	var statements []string
+
 	var current strings.Builder
 
 	lines := strings.Split(content, "\n")
@@ -453,10 +469,12 @@ func (*Migrator) parseStatements(content string) []string {
 			stmt := strings.TrimSpace(current.String())
 			// Remove trailing semicolon for gocql.
 			stmt = strings.TrimSuffix(stmt, ";")
+
 			stmt = strings.TrimSpace(stmt)
 			if stmt != "" {
 				statements = append(statements, stmt)
 			}
+
 			current.Reset()
 		}
 	}

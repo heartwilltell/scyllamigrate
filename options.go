@@ -28,7 +28,9 @@ func WithFS(fsys fs.FS) Option {
 		if err != nil {
 			return err
 		}
+
 		m.source = source
+
 		return nil
 	}
 }
@@ -40,7 +42,9 @@ func WithDir(path string) Option {
 		if err != nil {
 			return err
 		}
+
 		m.source = source
+
 		return nil
 	}
 }
@@ -80,6 +84,7 @@ func WithStdLogger(l *log.Logger) Option {
 		}
 
 		m.logger = slog.New(&logHandler{logger: l})
+
 		return nil
 	}
 }

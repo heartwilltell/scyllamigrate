@@ -110,6 +110,7 @@ func (s *FSSource) List() ([]*MigrationPair, error) {
 	for _, version := range s.versions {
 		pairs = append(pairs, s.migrations[version])
 	}
+
 	return pairs, nil
 }
 
@@ -167,5 +168,6 @@ func (s *FSSource) Get(version uint64) (*MigrationPair, bool) {
 func (s *FSSource) Versions() []uint64 {
 	result := make([]uint64, len(s.versions))
 	copy(result, s.versions)
+
 	return result
 }

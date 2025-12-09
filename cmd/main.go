@@ -106,12 +106,16 @@ func upCmd() *scotty.Command {
 			defer cancel()
 
 			var applied int
-			if steps > 0 {
+
+			switch {
+			case steps > 0:
 				if err := migrator.Steps(ctx, steps); err != nil {
 					return err
 				}
+
 				applied = steps
-			} else {
+
+			default:
 				applied, err = migrator.Up(ctx)
 				if err != nil {
 					return err
@@ -120,9 +124,11 @@ func upCmd() *scotty.Command {
 
 			if applied == 0 {
 				fmt.Println("No migrations to apply")
-			} else {
-				fmt.Printf("Applied %d migration(s)\n", applied)
+
+				return nil
 			}
+
+			fmt.Printf("Applied %d migration(s)\n", applied)
 
 			return nil
 		},
@@ -160,6 +166,7 @@ func downCmd() *scotty.Command {
 			}
 
 			fmt.Printf("Rolled back %d migration(s)\n", steps)
+
 			return nil
 		},
 	}
@@ -190,16 +197,19 @@ func statusCmd() *scotty.Command {
 			if len(status.Applied) > 0 {
 				fmt.Println("Applied Migrations:")
 				fmt.Println("-------------------")
+
 				for _, m := range status.Applied {
 					fmt.Printf("  [%d] %s (applied at %s, took %dms)\n",
 						m.Version, m.Description, m.AppliedAt.Format(time.RFC3339), m.ExecutionMs)
 				}
+
 				fmt.Println()
 			}
 
 			if len(status.Pending) > 0 {
 				fmt.Println("Pending Migrations:")
 				fmt.Println("-------------------")
+
 				for _, m := range status.Pending {
 					fmt.Printf("  [%d] %s\n", m.Version, m.Description)
 				}
@@ -382,10 +392,12 @@ func findNextVersion(dir string) (uint64, error) {
 		if os.IsNotExist(err) {
 			return 1, nil
 		}
+
 		return 0, err
 	}
 
 	var maxVersion uint64
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue

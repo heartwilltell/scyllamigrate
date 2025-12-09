@@ -165,4 +165,3 @@ func TestMultipleOptions(t *testing.T) {
 	td.Cmp(t, m.waitForSchemaAgreement, true)
 	td.Cmp(t, m.schemaAgreementTimeout, 1000)
 }
-
