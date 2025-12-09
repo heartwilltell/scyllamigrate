@@ -67,29 +67,47 @@ func getTestSession(t *testing.T) (*gocql.Session, string) {
 
 	session.Close()
 
-	// Now connect with keyspace - retry a few times as keyspace may not be immediately available
-	cluster.Keyspace = keyspace
-	var finalSession *gocql.Session
-	var connectErr error
-	maxRetries := 5
+	// Verify keyspace exists and wait for it to be available
+	// Retry checking for keyspace existence before connecting
+	var keyspaceExists bool
+	maxRetries := 10
 	for i := 0; i < maxRetries; i++ {
-		finalSession, connectErr = cluster.CreateSession()
-		if connectErr == nil {
-			session = finalSession
-			break
+		checkSession, checkErr := cluster.CreateSession()
+		if checkErr == nil {
+			var count int
+			checkErr = checkSession.Query(`SELECT COUNT(*) FROM system_schema.keyspaces WHERE keyspace_name = ?`, keyspace).Scan(&count)
+			checkSession.Close()
+			if checkErr == nil && count > 0 {
+				keyspaceExists = true
+				break
+			}
 		}
 		if i < maxRetries-1 {
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 		}
 	}
-	if connectErr != nil {
+
+	if !keyspaceExists {
 		// Cleanup keyspace on failure
 		cleanupSession, _ := gocql.NewCluster(hosts).CreateSession()
 		if cleanupSession != nil {
 			cleanupSession.Query(`DROP KEYSPACE IF EXISTS ` + keyspace).Exec()
 			cleanupSession.Close()
 		}
-		t.Fatalf("Failed to create session with keyspace after %d retries: %v", maxRetries, connectErr)
+		t.Fatalf("Keyspace %s not available after %d retries", keyspace, maxRetries)
+	}
+
+	// Now connect with keyspace
+	cluster.Keyspace = keyspace
+	session, err = cluster.CreateSession()
+	if err != nil {
+		// Cleanup keyspace on failure
+		cleanupSession, _ := gocql.NewCluster(hosts).CreateSession()
+		if cleanupSession != nil {
+			cleanupSession.Query(`DROP KEYSPACE IF EXISTS ` + keyspace).Exec()
+			cleanupSession.Close()
+		}
+		t.Fatalf("Failed to create session with keyspace: %v", err)
 	}
 
 	// Register cleanup function
