@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	td "github.com/maxatome/go-testdeep/td"
 )
 
 func TestError_Error(t *testing.T) {
@@ -95,9 +97,7 @@ func TestError_Is(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := errors.Is(tt.err, tt.target); got != tt.expected {
-				t.Errorf("errors.Is(%v, %v) = %v, want %v", tt.err, tt.target, got, tt.expected)
-			}
+			td.Cmp(t, errors.Is(tt.err, tt.target), tt.expected)
 		})
 	}
 }
@@ -126,9 +126,7 @@ func TestParseError_Error(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := tt.err.Error(); got != tt.expected {
-				t.Errorf("Error() = %q, want %q", got, tt.expected)
-			}
+			td.Cmp(t, tt.err.Error(), tt.expected)
 		})
 	}
 }
@@ -140,18 +138,14 @@ func TestParseError_Unwrap(t *testing.T) {
 		Err:      underlyingErr,
 	}
 
-	if got := err.Unwrap(); got != underlyingErr {
-		t.Errorf("Unwrap() = %v, want %v", got, underlyingErr)
-	}
+	td.Cmp(t, err.Unwrap(), underlyingErr)
 
 	errNoUnderlying := &ParseError{
 		Filename: "invalid_file.cql",
 		Err:      nil,
 	}
 
-	if got := errNoUnderlying.Unwrap(); got != nil {
-		t.Errorf("Unwrap() = %v, want nil", got)
-	}
+	td.Cmp(t, errNoUnderlying.Unwrap(), td.Nil())
 }
 
 func TestMigrationError_Error(t *testing.T) {
@@ -200,9 +194,7 @@ func TestMigrationError_Error(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := tt.err.Error(); got != tt.expected {
-				t.Errorf("Error() = %q, want %q", got, tt.expected)
-			}
+			td.Cmp(t, tt.err.Error(), tt.expected)
 		})
 	}
 }
@@ -216,9 +208,7 @@ func TestMigrationError_Unwrap(t *testing.T) {
 		Err:       underlyingErr,
 	}
 
-	if got := err.Unwrap(); got != underlyingErr {
-		t.Errorf("Unwrap() = %v, want %v", got, underlyingErr)
-	}
+	td.Cmp(t, err.Unwrap(), underlyingErr)
 }
 
 func TestMigrationError_Is(t *testing.T) {
@@ -231,14 +221,10 @@ func TestMigrationError_Is(t *testing.T) {
 	}
 
 	// Should match the wrapped error
-	if !errors.Is(err, ErrMissingUp) {
-		t.Error("errors.Is() should match wrapped ErrMissingUp")
-	}
+	td.CmpErrorIs(t, err, ErrMissingUp)
 
 	// Should not match unrelated errors
-	if errors.Is(err, ErrNoChange) {
-		t.Error("errors.Is() should not match unrelated error")
-	}
+	td.Cmp(t, errors.Is(err, ErrNoChange), false)
 }
 
 func TestSourceError_Error(t *testing.T) {
@@ -275,9 +261,7 @@ func TestSourceError_Error(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := tt.err.Error(); got != tt.expected {
-				t.Errorf("Error() = %q, want %q", got, tt.expected)
-			}
+			td.Cmp(t, tt.err.Error(), tt.expected)
 		})
 	}
 }
@@ -290,9 +274,7 @@ func TestSourceError_Unwrap(t *testing.T) {
 		Err:     underlyingErr,
 	}
 
-	if got := err.Unwrap(); got != underlyingErr {
-		t.Errorf("Unwrap() = %v, want %v", got, underlyingErr)
-	}
+	td.Cmp(t, err.Unwrap(), underlyingErr)
 }
 
 func TestSourceError_Is(t *testing.T) {
@@ -304,14 +286,10 @@ func TestSourceError_Is(t *testing.T) {
 	}
 
 	// Should match the wrapped error
-	if !errors.Is(err, ErrVersionNotFound) {
-		t.Error("errors.Is() should match wrapped ErrVersionNotFound")
-	}
+	td.CmpErrorIs(t, err, ErrVersionNotFound)
 
 	// Should not match unrelated errors
-	if errors.Is(err, ErrNoChange) {
-		t.Error("errors.Is() should not match unrelated error")
-	}
+	td.Cmp(t, errors.Is(err, ErrNoChange), false)
 }
 
 func TestNestedErrorUnwrapping(t *testing.T) {
@@ -330,11 +308,7 @@ func TestNestedErrorUnwrapping(t *testing.T) {
 	}
 
 	// Should be able to unwrap through multiple layers
-	if !errors.Is(migrationErr, originalErr) {
-		t.Error("errors.Is() should match deeply nested error")
-	}
+	td.CmpErrorIs(t, migrationErr, originalErr)
 
-	if !errors.Is(migrationErr, sourceErr) {
-		t.Error("errors.Is() should match intermediate wrapped error")
-	}
+	td.CmpErrorIs(t, migrationErr, sourceErr)
 }

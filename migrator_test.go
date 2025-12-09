@@ -11,6 +11,7 @@ import (
 	"testing/fstest"
 
 	"github.com/gocql/gocql"
+	td "github.com/maxatome/go-testdeep/td"
 )
 
 // mockSource is a test implementation of Source
@@ -59,9 +60,7 @@ func TestNew(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	type tcase struct {
 		session *gocql.Session
@@ -95,16 +94,9 @@ func TestNew(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, err := New(tt.session, tt.opts...)
 			if tt.wantErr != nil {
-				if err == nil {
-					t.Fatalf("New() error = nil, want %v", tt.wantErr)
-				}
-				if !errors.Is(err, tt.wantErr) {
-					t.Errorf("New() error = %v, want %v", err, tt.wantErr)
-				}
+				td.CmpErrorIs(t, err, tt.wantErr)
 			} else {
-				if err != nil {
-					t.Errorf("New() error = %v, want nil", err)
-				}
+				td.CmpNoError(t, err)
 			}
 		})
 	}
@@ -115,24 +107,14 @@ func TestNew_DefaultValues(t *testing.T) {
 		"000001_create_users.up.cql": {Data: []byte("CREATE TABLE users;")},
 	}
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	m, err := New(&gocql.Session{}, WithSource(source), WithKeyspace("test"))
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
-	if m.historyTable != "schema_migrations" {
-		t.Errorf("historyTable = %q, want %q", m.historyTable, "schema_migrations")
-	}
-	if m.consistency != gocql.Quorum {
-		t.Errorf("consistency = %v, want %v", m.consistency, gocql.Quorum)
-	}
-	if !m.waitForSchemaAgreement {
-		t.Error("waitForSchemaAgreement = false, want true")
-	}
+	td.Cmp(t, m.historyTable, "schema_migrations")
+	td.Cmp(t, m.consistency, gocql.Quorum)
+	td.Cmp(t, m.waitForSchemaAgreement, true)
 }
 
 func TestMigrator_parseStatements(t *testing.T) {
@@ -200,17 +182,7 @@ func TestMigrator_parseStatements(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			got := m.parseStatements(tt.content)
-			if len(got) != len(tt.expected) {
-				t.Errorf("parseStatements() returned %d statements, want %d", len(got), len(tt.expected))
-				t.Errorf("Got: %v", got)
-				t.Errorf("Want: %v", tt.expected)
-				return
-			}
-			for i, stmt := range got {
-				if stmt != tt.expected[i] {
-					t.Errorf("parseStatements()[%d] = %q, want %q", i, stmt, tt.expected[i])
-				}
-			}
+			td.Cmp(t, got, tt.expected)
 		})
 	}
 }
@@ -241,20 +213,14 @@ func TestMigrator_checksum(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got := m.checksum(tt.content)
 			// Verify it's a valid hex string of correct length (SHA-256 = 64 hex chars)
-			if len(got) != 64 {
-				t.Errorf("checksum() length = %d, want 64", len(got))
-			}
+			td.Cmp(t, len(got), 64)
 			// Verify it's deterministic
 			got2 := m.checksum(tt.content)
-			if got != got2 {
-				t.Errorf("checksum() not deterministic: %q != %q", got, got2)
-			}
+			td.Cmp(t, got, got2)
 			// Verify different content produces different checksums
 			if len(tt.content) > 0 {
 				other := m.checksum([]byte("different content"))
-				if got == other {
-					t.Error("checksum() produced same hash for different content")
-				}
+				td.Cmp(t, got != other, true)
 			}
 		})
 	}
@@ -294,9 +260,7 @@ func TestMigrator_readMigrationContent(t *testing.T) {
 		"000001_create_users.down.cql": {Data: []byte("DROP TABLE users;")},
 	}
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	m := &Migrator{source: source}
 
@@ -312,12 +276,8 @@ func TestMigrator_readMigrationContent(t *testing.T) {
 			direction: Up,
 			wantErr:   false,
 			checkFunc: func(t *testing.T, content []byte, err error) {
-				if err != nil {
-					t.Fatalf("readMigrationContent() error = %v", err)
-				}
-				if string(content) != "CREATE TABLE users;" {
-					t.Errorf("readMigrationContent() content = %q, want %q", string(content), "CREATE TABLE users;")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, string(content), "CREATE TABLE users;")
 			},
 		},
 		"read down migration": {
@@ -325,12 +285,8 @@ func TestMigrator_readMigrationContent(t *testing.T) {
 			direction: Down,
 			wantErr:   false,
 			checkFunc: func(t *testing.T, content []byte, err error) {
-				if err != nil {
-					t.Fatalf("readMigrationContent() error = %v", err)
-				}
-				if string(content) != "DROP TABLE users;" {
-					t.Errorf("readMigrationContent() content = %q, want %q", string(content), "DROP TABLE users;")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, string(content), "DROP TABLE users;")
 			},
 		},
 		"invalid direction": {
@@ -338,9 +294,7 @@ func TestMigrator_readMigrationContent(t *testing.T) {
 			direction: Direction("invalid"),
 			wantErr:   true,
 			checkFunc: func(t *testing.T, content []byte, err error) {
-				if err == nil {
-					t.Fatal("readMigrationContent() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 		"version not found": {
@@ -348,9 +302,7 @@ func TestMigrator_readMigrationContent(t *testing.T) {
 			direction: Up,
 			wantErr:   true,
 			checkFunc: func(t *testing.T, content []byte, err error) {
-				if err == nil {
-					t.Fatal("readMigrationContent() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 	}
@@ -358,9 +310,10 @@ func TestMigrator_readMigrationContent(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			content, err := m.readMigrationContent(tt.version, tt.direction)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readMigrationContent() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
 			}
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, content, err)
@@ -386,12 +339,8 @@ func TestMigrator_Pending(t *testing.T) {
 	// This will fail because getAppliedVersions needs a database,
 	// but we can verify the source.List() call works
 	all, err := source.List()
-	if err != nil {
-		t.Fatalf("source.List() error = %v", err)
-	}
-	if len(all) != 3 {
-		t.Errorf("source.List() returned %d pairs, want 3", len(all))
-	}
+	td.CmpNoError(t, err)
+	td.Cmp(t, len(all), 3)
 
 	// Test that Pending calls source.List() correctly
 	// (actual test would require mocking the database)
@@ -423,8 +372,10 @@ func TestMigrator_Close(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := &Migrator{source: tt.source}
 			err := m.Close()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Close() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
 			}
 		})
 	}
@@ -450,12 +401,8 @@ func TestMigrator_applyUp_ErrorCases(t *testing.T) {
 			wantErr: true,
 			checkErr: func(t *testing.T, err error) {
 				var me *MigrationError
-				if !errors.As(err, &me) {
-					t.Errorf("error type = %T, want *MigrationError", err)
-				}
-				if me.Err != ErrMissingUp {
-					t.Errorf("MigrationError.Err = %v, want %v", me.Err, ErrMissingUp)
-				}
+				td.Cmp(t, errors.As(err, &me), true)
+				td.Cmp(t, me.Err, ErrMissingUp)
 			},
 		},
 	}
@@ -466,8 +413,12 @@ func TestMigrator_applyUp_ErrorCases(t *testing.T) {
 				source: tt.source,
 			}
 			err := m.applyUp(ctx, tt.pair)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("applyUp() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
+			}
+			if !tt.wantErr {
 				return
 			}
 			if tt.checkErr != nil {
@@ -497,12 +448,8 @@ func TestMigrator_applyDown_ErrorCases(t *testing.T) {
 			wantErr: true,
 			checkErr: func(t *testing.T, err error) {
 				var me *MigrationError
-				if !errors.As(err, &me) {
-					t.Errorf("error type = %T, want *MigrationError", err)
-				}
-				if me.Err != ErrVersionNotFound {
-					t.Errorf("MigrationError.Err = %v, want %v", me.Err, ErrVersionNotFound)
-				}
+				td.Cmp(t, errors.As(err, &me), true)
+				td.Cmp(t, me.Err, ErrVersionNotFound)
 			},
 		},
 		"missing down migration": {
@@ -520,12 +467,8 @@ func TestMigrator_applyDown_ErrorCases(t *testing.T) {
 			wantErr: true,
 			checkErr: func(t *testing.T, err error) {
 				var me *MigrationError
-				if !errors.As(err, &me) {
-					t.Errorf("error type = %T, want *MigrationError", err)
-				}
-				if me.Err != ErrMissingDown {
-					t.Errorf("MigrationError.Err = %v, want %v", me.Err, ErrMissingDown)
-				}
+				td.Cmp(t, errors.As(err, &me), true)
+				td.Cmp(t, me.Err, ErrMissingDown)
 			},
 		},
 	}
@@ -536,8 +479,12 @@ func TestMigrator_applyDown_ErrorCases(t *testing.T) {
 				source: tt.source,
 			}
 			err := m.applyDown(ctx, tt.version)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("applyDown() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
+			}
+			if !tt.wantErr {
 				return
 			}
 			if tt.checkErr != nil {
@@ -591,11 +538,7 @@ func TestMigrator_parseStatements_EdgeCases(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			got := m.parseStatements(tt.content)
-			if len(got) != tt.expected {
-				t.Errorf("parseStatements() returned %d statements, want %d", len(got), tt.expected)
-				t.Errorf("Content: %q", tt.content)
-				t.Errorf("Got: %v", got)
-			}
+			td.Cmp(t, len(got), tt.expected)
 		})
 	}
 }
@@ -607,21 +550,15 @@ func TestMigrator_checksum_Consistency(t *testing.T) {
 	hash1 := m.checksum(content)
 	hash2 := m.checksum(content)
 
-	if hash1 != hash2 {
-		t.Errorf("checksum() not consistent: %q != %q", hash1, hash2)
-	}
+	td.Cmp(t, hash1, hash2)
 
 	// Verify it's a valid hex string
-	if len(hash1) != 64 {
-		t.Errorf("checksum() length = %d, want 64", len(hash1))
-	}
+	td.Cmp(t, len(hash1), 64)
 
 	// Verify different content produces different hash
 	otherContent := []byte("DROP TABLE users;")
 	otherHash := m.checksum(otherContent)
-	if hash1 == otherHash {
-		t.Error("checksum() produced same hash for different content")
-	}
+	td.Cmp(t, hash1 != otherHash, true)
 }
 
 func TestMigrator_readMigrationContent_ReadError(t *testing.T) {
@@ -639,9 +576,7 @@ func TestMigrator_readMigrationContent_ReadError(t *testing.T) {
 
 	m := &Migrator{source: source}
 	_, err := m.readMigrationContent(1, Up)
-	if err == nil {
-		t.Fatal("readMigrationContent() error = nil, want error")
-	}
+	td.CmpError(t, err)
 }
 
 // Test helper to verify checksum format
@@ -653,15 +588,11 @@ func TestMigrator_checksum_Format(t *testing.T) {
 
 	// Verify it's hexadecimal
 	for _, c := range hash {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			t.Errorf("checksum() contains non-hex character: %c", c)
-		}
+		td.Cmp(t, (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'), true)
 	}
 
 	// Verify length (SHA-256 = 64 hex characters)
-	if len(hash) != 64 {
-		t.Errorf("checksum() length = %d, want 64", len(hash))
-	}
+	td.Cmp(t, len(hash), 64)
 }
 
 func TestMigrator_log_WithLogger(t *testing.T) {
@@ -672,9 +603,7 @@ func TestMigrator_log_WithLogger(t *testing.T) {
 	m.log("test message %d", 42)
 
 	output := buf.String()
-	if !strings.Contains(output, "test message 42") {
-		t.Errorf("log() output = %q, should contain 'test message 42'", output)
-	}
+	td.Cmp(t, output, td.String("test message 42"))
 }
 
 func TestMigrator_log_WithoutLogger(t *testing.T) {
@@ -699,13 +628,9 @@ func TestMigrator_readMigrationContent_CloseReader(t *testing.T) {
 
 	m := &Migrator{source: source}
 	_, err := m.readMigrationContent(1, Up)
-	if err != nil {
-		t.Fatalf("readMigrationContent() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
-	if !closed {
-		t.Error("readMigrationContent() did not close reader")
-	}
+	td.Cmp(t, closed, true)
 }
 
 type testReadCloser struct {

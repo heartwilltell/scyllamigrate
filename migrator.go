@@ -14,6 +14,10 @@ import (
 	"github.com/gocql/gocql"
 )
 
+// defaultHistoryTable represents the default history table name.
+// This is used if no history table name is provided.
+const defaultHistoryTable = "schema_migrations"
+
 // Migrator manages database migrations.
 type Migrator struct {
 	session                *gocql.Session
@@ -34,7 +38,7 @@ func New(session *gocql.Session, opts ...Option) (*Migrator, error) {
 
 	m := &Migrator{
 		session:                session,
-		historyTable:           "schema_migrations",
+		historyTable:           defaultHistoryTable,
 		consistency:            gocql.Quorum,
 		waitForSchemaAgreement: true,
 	}
@@ -72,6 +76,7 @@ func (m *Migrator) Up(ctx context.Context) (int, error) {
 	}
 
 	applied := 0
+
 	for _, pair := range pending {
 		if err := m.applyUp(ctx, pair); err != nil {
 			return applied, err
@@ -190,12 +195,9 @@ func (m *Migrator) Steps(ctx context.Context, n int) error {
 			return applied[i].Version > applied[j].Version
 		})
 
-		count := -n
-		if count > len(applied) {
-			count = len(applied)
-		}
+		count := min(-n, len(applied))
 
-		for i := 0; i < count; i++ {
+		for i := range count {
 			if err := m.applyDown(ctx, applied[i].Version); err != nil {
 				return err
 			}

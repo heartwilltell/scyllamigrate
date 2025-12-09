@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"testing"
 	"testing/fstest"
+
+	td "github.com/maxatome/go-testdeep/td"
 )
 
 func TestNewFSSource(t *testing.T) {
@@ -22,19 +24,11 @@ func TestNewFSSource(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
-				if err != nil {
-					t.Fatalf("NewFSSource() error = %v, want nil", err)
-				}
-				if s == nil {
-					t.Fatal("NewFSSource() returned nil source")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, s, td.NotNil())
 				pairs, err := s.List()
-				if err != nil {
-					t.Fatalf("List() error = %v", err)
-				}
-				if len(pairs) != 2 {
-					t.Errorf("List() returned %d pairs, want 2", len(pairs))
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, len(pairs), 2)
 			},
 		},
 		"only up migrations": {
@@ -44,18 +38,10 @@ func TestNewFSSource(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
-				if err != nil {
-					t.Fatalf("NewFSSource() error = %v, want nil", err)
-				}
+				td.CmpNoError(t, err)
 				pairs, _ := s.List()
-				if len(pairs) != 2 {
-					t.Errorf("List() returned %d pairs, want 2", len(pairs))
-				}
-				if pairs[0].HasUp() && !pairs[0].HasDown() {
-					// Expected: has up but no down
-				} else {
-					t.Error("Expected first pair to have up but no down")
-				}
+				td.Cmp(t, len(pairs), 2)
+				td.Cmp(t, pairs[0].HasUp() && !pairs[0].HasDown(), true)
 			},
 		},
 		"mixed extensions": {
@@ -65,9 +51,7 @@ func TestNewFSSource(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
-				if err != nil {
-					t.Fatalf("NewFSSource() error = %v, want nil", err)
-				}
+				td.CmpNoError(t, err)
 			},
 		},
 		"non-migration files ignored": {
@@ -78,13 +62,9 @@ func TestNewFSSource(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
-				if err != nil {
-					t.Fatalf("NewFSSource() error = %v, want nil", err)
-				}
+				td.CmpNoError(t, err)
 				pairs, _ := s.List()
-				if len(pairs) != 1 {
-					t.Errorf("List() returned %d pairs, want 1", len(pairs))
-				}
+				td.Cmp(t, len(pairs), 1)
 			},
 		},
 		"invalid migration filename ignored": {
@@ -93,26 +73,18 @@ func TestNewFSSource(t *testing.T) {
 			},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
-				if err != nil {
-					t.Fatalf("NewFSSource() error = %v, want nil (invalid files are ignored)", err)
-				}
+				td.CmpNoError(t, err)
 				pairs, _ := s.List()
-				if len(pairs) != 0 {
-					t.Errorf("List() returned %d pairs, want 0 (invalid files should be ignored)", len(pairs))
-				}
+				td.Cmp(t, len(pairs), 0)
 			},
 		},
 		"empty filesystem": {
 			files:   map[string]string{},
 			wantErr: false,
 			checkFunc: func(t *testing.T, s *FSSource, err error) {
-				if err != nil {
-					t.Fatalf("NewFSSource() error = %v, want nil", err)
-				}
+				td.CmpNoError(t, err)
 				pairs, _ := s.List()
-				if len(pairs) != 0 {
-					t.Errorf("List() returned %d pairs, want 0", len(pairs))
-				}
+				td.Cmp(t, len(pairs), 0)
 			},
 		},
 	}
@@ -127,8 +99,12 @@ func TestNewFSSource(t *testing.T) {
 			}
 
 			got, err := NewFSSource(fsys)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewFSSource() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
+			}
+			if tt.wantErr {
 				return
 			}
 			if tt.checkFunc != nil {
@@ -148,32 +124,22 @@ func TestFSSource_List(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	pairs, err := source.List()
-	if err != nil {
-		t.Fatalf("List() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
-	if len(pairs) != 3 {
-		t.Fatalf("List() returned %d pairs, want 3", len(pairs))
-	}
+	td.Cmp(t, len(pairs), 3)
 
 	// Check sorting
 	for i := 0; i < len(pairs)-1; i++ {
-		if pairs[i].Version >= pairs[i+1].Version {
-			t.Errorf("Pairs not sorted: %d >= %d", pairs[i].Version, pairs[i+1].Version)
-		}
+		td.Cmp(t, pairs[i].Version < pairs[i+1].Version, true)
 	}
 
 	// Check versions
 	expectedVersions := []uint64{1, 2, 3}
 	for i, pair := range pairs {
-		if pair.Version != expectedVersions[i] {
-			t.Errorf("Pairs[%d].Version = %d, want %d", i, pair.Version, expectedVersions[i])
-		}
+		td.Cmp(t, pair.Version, expectedVersions[i])
 	}
 }
 
@@ -184,9 +150,7 @@ func TestFSSource_ReadUp(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	type tcase struct {
 		version   uint64
@@ -198,44 +162,28 @@ func TestFSSource_ReadUp(t *testing.T) {
 			version: 1,
 			wantErr: false,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
-				if err != nil {
-					t.Fatalf("ReadUp() error = %v, want nil", err)
-				}
-				if r == nil {
-					t.Fatal("ReadUp() returned nil reader")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, r, td.NotNil())
 				defer r.Close()
 				data, err := io.ReadAll(r)
-				if err != nil {
-					t.Fatalf("ReadAll() error = %v", err)
-				}
-				if string(data) != "CREATE TABLE users;" {
-					t.Errorf("ReadUp() content = %q, want %q", string(data), "CREATE TABLE users;")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, string(data), "CREATE TABLE users;")
 			},
 		},
 		"version not found": {
 			version: 999,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
-				if err == nil {
-					t.Fatal("ReadUp() error = nil, want error")
-				}
-				if _, ok := err.(*SourceError); !ok {
-					t.Errorf("error type = %T, want *SourceError", err)
-				}
+				td.CmpError(t, err)
+				td.Cmp(t, err, td.Isa((*SourceError)(nil)))
 			},
 		},
 		"up migration missing": {
 			version: 2,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
-				if err == nil {
-					t.Fatal("ReadUp() error = nil, want error")
-				}
-				if _, ok := err.(*SourceError); !ok {
-					t.Errorf("error type = %T, want *SourceError", err)
-				}
+				td.CmpError(t, err)
+				td.Cmp(t, err, td.Isa((*SourceError)(nil)))
 			},
 		},
 	}
@@ -243,8 +191,12 @@ func TestFSSource_ReadUp(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			r, err := source.ReadUp(tt.version)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadUp() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
+			}
+			if tt.wantErr {
 				return
 			}
 			if tt.checkFunc != nil {
@@ -264,9 +216,7 @@ func TestFSSource_ReadDown(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	type tcase struct {
 		version   uint64
@@ -278,38 +228,26 @@ func TestFSSource_ReadDown(t *testing.T) {
 			version: 1,
 			wantErr: false,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
-				if err != nil {
-					t.Fatalf("ReadDown() error = %v, want nil", err)
-				}
-				if r == nil {
-					t.Fatal("ReadDown() returned nil reader")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, r, td.NotNil())
 				defer r.Close()
 				data, err := io.ReadAll(r)
-				if err != nil {
-					t.Fatalf("ReadAll() error = %v", err)
-				}
-				if string(data) != "DROP TABLE users;" {
-					t.Errorf("ReadDown() content = %q, want %q", string(data), "DROP TABLE users;")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, string(data), "DROP TABLE users;")
 			},
 		},
 		"version not found": {
 			version: 999,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
-				if err == nil {
-					t.Fatal("ReadDown() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 		"down migration missing": {
 			version: 2,
 			wantErr: true,
 			checkFunc: func(t *testing.T, r io.ReadCloser, err error) {
-				if err == nil {
-					t.Fatal("ReadDown() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 	}
@@ -317,8 +255,12 @@ func TestFSSource_ReadDown(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			r, err := source.ReadDown(tt.version)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadDown() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
+			}
+			if tt.wantErr {
 				return
 			}
 			if tt.checkFunc != nil {
@@ -337,18 +279,12 @@ func TestFSSource_Close(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
-	if err := source.Close(); err != nil {
-		t.Errorf("Close() error = %v, want nil", err)
-	}
+	td.CmpNoError(t, source.Close())
 
 	// Should be safe to close multiple times
-	if err := source.Close(); err != nil {
-		t.Errorf("Close() second time error = %v, want nil", err)
-	}
+	td.CmpNoError(t, source.Close())
 }
 
 func TestFSSource_Get(t *testing.T) {
@@ -359,9 +295,7 @@ func TestFSSource_Get(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	type tcase struct {
 		version uint64
@@ -381,14 +315,11 @@ func TestFSSource_Get(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			pair, got := source.Get(tt.version)
-			if got != tt.want {
-				t.Errorf("Get() = %v, want %v", got, tt.want)
-			}
-			if tt.want && pair == nil {
-				t.Error("Get() returned nil pair for existing version")
-			}
-			if !tt.want && pair != nil {
-				t.Error("Get() returned non-nil pair for non-existent version")
+			td.Cmp(t, got, tt.want)
+			if tt.want {
+				td.Cmp(t, pair, td.NotNil())
+			} else {
+				td.Cmp(t, pair, td.Nil())
 			}
 		})
 	}
@@ -402,29 +333,17 @@ func TestFSSource_Versions(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	versions := source.Versions()
 	expected := []uint64{1, 2, 3}
 
-	if len(versions) != len(expected) {
-		t.Fatalf("Versions() returned %d versions, want %d", len(versions), len(expected))
-	}
-
-	for i, v := range versions {
-		if v != expected[i] {
-			t.Errorf("Versions()[%d] = %d, want %d", i, v, expected[i])
-		}
-	}
+	td.Cmp(t, versions, expected)
 
 	// Verify it's a copy (modifying shouldn't affect source)
 	versions[0] = 999
 	versions2 := source.Versions()
-	if versions2[0] == 999 {
-		t.Error("Versions() did not return a copy")
-	}
+	td.Cmp(t, versions2[0] == 999, false)
 }
 
 func TestFSSource_scanError(t *testing.T) {
@@ -440,13 +359,9 @@ func TestFSSource_scanError(t *testing.T) {
 	}
 
 	pairs, err := source.List()
-	if err != nil {
-		t.Fatalf("List() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
-	if len(pairs) != 0 {
-		t.Errorf("List() returned %d pairs, want 0 (invalid files should be ignored)", len(pairs))
-	}
+	td.Cmp(t, len(pairs), 0)
 }
 
 func TestFSSource_scanWithDirectories(t *testing.T) {
@@ -459,16 +374,10 @@ func TestFSSource_scanWithDirectories(t *testing.T) {
 	}
 
 	source, err := NewFSSource(fsys)
-	if err != nil {
-		t.Fatalf("NewFSSource() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
 	pairs, err := source.List()
-	if err != nil {
-		t.Fatalf("List() error = %v", err)
-	}
+	td.CmpNoError(t, err)
 
-	if len(pairs) != 1 {
-		t.Errorf("List() returned %d pairs, want 1 (directories should be ignored)", len(pairs))
-	}
+	td.Cmp(t, len(pairs), 1)
 }

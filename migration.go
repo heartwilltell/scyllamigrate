@@ -18,9 +18,7 @@ const (
 )
 
 // String returns the string representation of the direction.
-func (d Direction) String() string {
-	return string(d)
-}
+func (d Direction) String() string { return string(d) }
 
 // Migration represents a single migration file.
 type Migration struct {

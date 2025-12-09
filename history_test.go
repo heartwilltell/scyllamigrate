@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	td "github.com/maxatome/go-testdeep/td"
 )
 
 // Test helper functions that test the logic without database
@@ -70,9 +71,7 @@ func TestGetLatestVersion_Logic(t *testing.T) {
 				}
 			}
 
-			if maxVersion != tt.expected {
-				t.Errorf("getLatestVersion logic = %d, want %d", maxVersion, tt.expected)
-			}
+			td.Cmp(t, maxVersion, tt.expected)
 		})
 	}
 }
@@ -124,15 +123,7 @@ func TestGetAppliedVersions_Logic(t *testing.T) {
 				versions[am.Version] = true
 			}
 
-			if len(versions) != len(tt.expected) {
-				t.Errorf("getAppliedVersions length = %d, want %d", len(versions), len(tt.expected))
-			}
-
-			for version, expected := range tt.expected {
-				if versions[version] != expected {
-					t.Errorf("getAppliedVersions[%d] = %v, want %v", version, versions[version], expected)
-				}
-			}
+			td.Cmp(t, versions, tt.expected)
 		})
 	}
 }
@@ -145,24 +136,14 @@ func TestHistorySchemaTemplate(t *testing.T) {
 	query := historySchemaTemplate
 	formatted := formatHistoryQuery(query, keyspace, table)
 
-	if formatted == "" {
-		t.Error("formatted query is empty")
-	}
-
-	if !contains(formatted, keyspace) {
-		t.Errorf("formatted query does not contain keyspace %q", keyspace)
-	}
-
-	if !contains(formatted, table) {
-		t.Errorf("formatted query does not contain table %q", table)
-	}
+	td.Cmp(t, formatted, td.NotEmpty())
+	td.Cmp(t, formatted, td.String(keyspace))
+	td.Cmp(t, formatted, td.String(table))
 
 	// Verify it contains expected CQL keywords
 	expectedKeywords := []string{"CREATE TABLE", "IF NOT EXISTS", "version", "description", "checksum", "applied_at", "execution_ms", "PRIMARY KEY"}
 	for _, keyword := range expectedKeywords {
-		if !contains(formatted, keyword) {
-			t.Errorf("formatted query does not contain keyword %q", keyword)
-		}
+		td.Cmp(t, formatted, td.String(keyword))
 	}
 }
 
@@ -175,24 +156,14 @@ func TestMigrationRecord(t *testing.T) {
 		duration:    100 * time.Millisecond,
 	}
 
-	if record.version != 1 {
-		t.Errorf("record.version = %d, want 1", record.version)
-	}
-	if record.description != "test migration" {
-		t.Errorf("record.description = %q, want %q", record.description, "test migration")
-	}
-	if record.checksum != "abc123" {
-		t.Errorf("record.checksum = %q, want %q", record.checksum, "abc123")
-	}
-	if record.duration != 100*time.Millisecond {
-		t.Errorf("record.duration = %v, want %v", record.duration, 100*time.Millisecond)
-	}
+	td.Cmp(t, record.version, uint64(1))
+	td.Cmp(t, record.description, "test migration")
+	td.Cmp(t, record.checksum, "abc123")
+	td.Cmp(t, record.duration, 100*time.Millisecond)
 
 	// Test duration conversion to milliseconds
 	ms := record.duration.Milliseconds()
-	if ms != 100 {
-		t.Errorf("duration.Milliseconds() = %d, want 100", ms)
-	}
+	td.Cmp(t, ms, int64(100))
 }
 
 func TestHistoryTableExists_Logic(t *testing.T) {
@@ -234,9 +205,7 @@ func TestHistoryTableExists_Logic(t *testing.T) {
 				result = tt.tableName != ""
 			}
 
-			if result != tt.expected {
-				t.Errorf("historyTableExists logic = %v, want %v", result, tt.expected)
-			}
+			td.Cmp(t, result, tt.expected)
 		})
 	}
 }
@@ -251,21 +220,11 @@ func TestAppliedMigration_Structure(t *testing.T) {
 		ExecutionMs: 150,
 	}
 
-	if am.Version != 1 {
-		t.Errorf("AppliedMigration.Version = %d, want 1", am.Version)
-	}
-	if am.Description != "test migration" {
-		t.Errorf("AppliedMigration.Description = %q, want %q", am.Description, "test migration")
-	}
-	if am.Checksum != "abc123def456" {
-		t.Errorf("AppliedMigration.Checksum = %q, want %q", am.Checksum, "abc123def456")
-	}
-	if !am.AppliedAt.Equal(now) {
-		t.Errorf("AppliedMigration.AppliedAt = %v, want %v", am.AppliedAt, now)
-	}
-	if am.ExecutionMs != 150 {
-		t.Errorf("AppliedMigration.ExecutionMs = %d, want 150", am.ExecutionMs)
-	}
+	td.Cmp(t, am.Version, uint64(1))
+	td.Cmp(t, am.Description, "test migration")
+	td.Cmp(t, am.Checksum, "abc123def456")
+	td.Cmp(t, am.AppliedAt.Equal(now), true)
+	td.Cmp(t, am.ExecutionMs, int64(150))
 }
 
 func TestGetLatestVersion_EdgeCases(t *testing.T) {
@@ -312,9 +271,7 @@ func TestGetLatestVersion_EdgeCases(t *testing.T) {
 				}
 			}
 
-			if maxVersion != tt.expected {
-				t.Errorf("getLatestVersion logic = %d, want %d", maxVersion, tt.expected)
-			}
+			td.Cmp(t, maxVersion, tt.expected)
 		})
 	}
 }
@@ -354,9 +311,7 @@ func TestGetAppliedVersions_EdgeCases(t *testing.T) {
 				}
 			}
 
-			if len(versions) != tt.expected {
-				t.Errorf("getAppliedVersions unique count = %d, want %d", len(versions), tt.expected)
-			}
+			td.Cmp(t, len(versions), tt.expected)
 		})
 	}
 }
@@ -390,27 +345,23 @@ func TestHistoryQueryFormatting(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Test ensureHistoryTable query
 			createQuery := formatHistoryQuery(historySchemaTemplate, tt.keyspace, tt.table)
-			if !contains(createQuery, tt.keyspace) || !contains(createQuery, tt.table) {
-				t.Errorf("create query does not contain keyspace/table: %q", createQuery)
-			}
+			td.Cmp(t, strings.Contains(createQuery, tt.keyspace), true)
+			td.Cmp(t, strings.Contains(createQuery, tt.table), true)
 
 			// Test recordMigration query
 			insertQuery := formatRecordQuery(tt.keyspace, tt.table)
-			if !contains(insertQuery, tt.keyspace) || !contains(insertQuery, tt.table) {
-				t.Errorf("insert query does not contain keyspace/table: %q", insertQuery)
-			}
+			td.Cmp(t, strings.Contains(insertQuery, tt.keyspace), true)
+			td.Cmp(t, strings.Contains(insertQuery, tt.table), true)
 
 			// Test removeMigration query
 			deleteQuery := formatRemoveQuery(tt.keyspace, tt.table)
-			if !contains(deleteQuery, tt.keyspace) || !contains(deleteQuery, tt.table) {
-				t.Errorf("delete query does not contain keyspace/table: %q", deleteQuery)
-			}
+			td.Cmp(t, strings.Contains(deleteQuery, tt.keyspace), true)
+			td.Cmp(t, strings.Contains(deleteQuery, tt.table), true)
 
 			// Test getAppliedMigrations query
 			selectQuery := formatSelectQuery(tt.keyspace, tt.table)
-			if !contains(selectQuery, tt.keyspace) || !contains(selectQuery, tt.table) {
-				t.Errorf("select query does not contain keyspace/table: %q", selectQuery)
-			}
+			td.Cmp(t, strings.Contains(selectQuery, tt.keyspace), true)
+			td.Cmp(t, strings.Contains(selectQuery, tt.table), true)
 		})
 	}
 }
@@ -450,9 +401,7 @@ func TestMigrationRecord_DurationConversion(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ms := tt.duration.Milliseconds()
-			if ms != tt.expected {
-				t.Errorf("duration.Milliseconds() = %d, want %d", ms, tt.expected)
-			}
+			td.Cmp(t, ms, tt.expected)
 		})
 	}
 }
@@ -546,9 +495,7 @@ func TestHistoryTableExists_ErrorHandling(t *testing.T) {
 				result = true
 			}
 
-			if result != tt.expected {
-				t.Errorf("historyTableExists error handling = %v, want %v", result, tt.expected)
-			}
+			td.Cmp(t, result, tt.expected)
 		})
 	}
 }

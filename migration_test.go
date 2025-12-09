@@ -2,6 +2,8 @@ package scyllamigrate
 
 import (
 	"testing"
+
+	td "github.com/maxatome/go-testdeep/td"
 )
 
 func TestDirection_String(t *testing.T) {
@@ -30,9 +32,7 @@ func TestDirection_String(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := tt.d.String(); got != tt.expected {
-				t.Errorf("String() = %q, want %q", got, tt.expected)
-			}
+			td.Cmp(t, tt.d.String(), tt.expected)
 		})
 	}
 }
@@ -48,66 +48,38 @@ func TestParseMigration(t *testing.T) {
 			filename: "000001_create_users.up.cql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err != nil {
-					t.Fatalf("ParseMigration() error = %v, want nil", err)
-				}
-				if m.Version != 1 {
-					t.Errorf("Version = %d, want 1", m.Version)
-				}
-				if m.Description != "create_users" {
-					t.Errorf("Description = %q, want %q", m.Description, "create_users")
-				}
-				if m.Direction != Up {
-					t.Errorf("Direction = %q, want %q", m.Direction, Up)
-				}
-				if m.Raw != "000001_create_users.up.cql" {
-					t.Errorf("Raw = %q, want %q", m.Raw, "000001_create_users.up.cql")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, m.Version, uint64(1))
+				td.Cmp(t, m.Description, "create_users")
+				td.Cmp(t, m.Direction, Up)
+				td.Cmp(t, m.Raw, "000001_create_users.up.cql")
 			},
 		},
 		"valid down migration with sql extension": {
 			filename: "000001_create_users.down.sql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err != nil {
-					t.Fatalf("ParseMigration() error = %v, want nil", err)
-				}
-				if m.Version != 1 {
-					t.Errorf("Version = %d, want 1", m.Version)
-				}
-				if m.Description != "create_users" {
-					t.Errorf("Description = %q, want %q", m.Description, "create_users")
-				}
-				if m.Direction != Down {
-					t.Errorf("Direction = %q, want %q", m.Direction, Down)
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, m.Version, uint64(1))
+				td.Cmp(t, m.Description, "create_users")
+				td.Cmp(t, m.Direction, Down)
 			},
 		},
 		"valid migration with multi-word description": {
 			filename: "000042_add_user_profile_table.up.cql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err != nil {
-					t.Fatalf("ParseMigration() error = %v, want nil", err)
-				}
-				if m.Version != 42 {
-					t.Errorf("Version = %d, want 42", m.Version)
-				}
-				if m.Description != "add_user_profile_table" {
-					t.Errorf("Description = %q, want %q", m.Description, "add_user_profile_table")
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, m.Version, uint64(42))
+				td.Cmp(t, m.Description, "add_user_profile_table")
 			},
 		},
 		"valid migration with single digit version": {
 			filename: "1_initial.up.cql",
 			wantErr:  false,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err != nil {
-					t.Fatalf("ParseMigration() error = %v, want nil", err)
-				}
-				if m.Version != 1 {
-					t.Errorf("Version = %d, want 1", m.Version)
-				}
+				td.CmpNoError(t, err)
+				td.Cmp(t, m.Version, uint64(1))
 			},
 		},
 		"valid migration with large version number": {
@@ -126,66 +98,50 @@ func TestParseMigration(t *testing.T) {
 			filename: "_create_users.up.cql",
 			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err == nil {
-					t.Fatal("ParseMigration() error = nil, want error")
-				}
-				if _, ok := err.(*ParseError); !ok {
-					t.Errorf("error type = %T, want *ParseError", err)
-				}
+				td.CmpError(t, err)
+				td.Cmp(t, err, td.Isa((*ParseError)(nil)))
 			},
 		},
 		"invalid - missing description": {
 			filename: "000001.up.cql",
 			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err == nil {
-					t.Fatal("ParseMigration() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 		"invalid - wrong direction": {
 			filename: "000001_create_users.sideways.cql",
 			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err == nil {
-					t.Fatal("ParseMigration() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 		"invalid - wrong extension": {
 			filename: "000001_create_users.up.txt",
 			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err == nil {
-					t.Fatal("ParseMigration() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 		"invalid - missing extension": {
 			filename: "000001_create_users.up",
 			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err == nil {
-					t.Fatal("ParseMigration() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 		"invalid - empty filename": {
 			filename: "",
 			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err == nil {
-					t.Fatal("ParseMigration() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 		"invalid - no underscores": {
 			filename: "000001createusers.up.cql",
 			wantErr:  true,
 			checkFunc: func(t *testing.T, m *Migration, err error) {
-				if err == nil {
-					t.Fatal("ParseMigration() error = nil, want error")
-				}
+				td.CmpError(t, err)
 			},
 		},
 	}
@@ -193,9 +149,10 @@ func TestParseMigration(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			got, err := ParseMigration(tt.filename)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseMigration() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr {
+				td.CmpError(t, err)
+			} else {
+				td.CmpNoError(t, err)
 			}
 			if tt.checkFunc != nil {
 				tt.checkFunc(t, got, err)
@@ -254,9 +211,7 @@ func TestIsMigrationFile(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := IsMigrationFile(tt.filename); got != tt.want {
-				t.Errorf("IsMigrationFile(%q) = %v, want %v", tt.filename, got, tt.want)
-			}
+			td.Cmp(t, IsMigrationFile(tt.filename), tt.want)
 		})
 	}
 }
@@ -289,9 +244,7 @@ func TestMigrationPair_HasUp(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := tt.pair.HasUp(); got != tt.want {
-				t.Errorf("HasUp() = %v, want %v", got, tt.want)
-			}
+			td.Cmp(t, tt.pair.HasUp(), tt.want)
 		})
 	}
 }
@@ -324,9 +277,7 @@ func TestMigrationPair_HasDown(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := tt.pair.HasDown(); got != tt.want {
-				t.Errorf("HasDown() = %v, want %v", got, tt.want)
-			}
+			td.Cmp(t, tt.pair.HasDown(), tt.want)
 		})
 	}
 }
