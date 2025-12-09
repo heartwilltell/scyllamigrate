@@ -44,7 +44,7 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -130,4 +130,4 @@ jobs:
         env:
           SCYLLA_HOSTS: localhost:9042
           SCYLLA_KEYSPACE: test_migrations
-        run: go test -v ./...
+        run: go test ./...
