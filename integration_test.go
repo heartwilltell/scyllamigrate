@@ -2,8 +2,10 @@ package scyllamigrate
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
@@ -16,31 +18,36 @@ func shouldRunIntegrationTests() bool {
 	return os.Getenv("SCYLLA_HOSTS") != "" && os.Getenv("SCYLLA_KEYSPACE") != ""
 }
 
-// getTestSession creates a gocql session for testing.
-func getTestSession(t *testing.T) *gocql.Session {
+// getTestSession creates a gocql session for testing with a unique keyspace per test.
+func getTestSession(t *testing.T) (*gocql.Session, string) {
 	hosts := os.Getenv("SCYLLA_HOSTS")
 	if hosts == "" {
 		t.Skip("SCYLLA_HOSTS not set, skipping integration test")
 	}
 
-	keyspace := os.Getenv("SCYLLA_KEYSPACE")
-	if keyspace == "" {
+	baseKeyspace := os.Getenv("SCYLLA_KEYSPACE")
+	if baseKeyspace == "" {
 		t.Skip("SCYLLA_KEYSPACE not set, skipping integration test")
 	}
+
+	// Create unique keyspace per test to avoid interference
+	// Sanitize test name for CQL identifier (replace invalid chars with underscores)
+	testName := regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(t.Name(), "_")
+	keyspace := fmt.Sprintf("%s_%s_%d", baseKeyspace, testName, time.Now().UnixNano())
 
 	cluster := gocql.NewCluster(hosts)
 	cluster.Timeout = 30 * time.Second
 	cluster.ConnectTimeout = 10 * time.Second
 	cluster.Consistency = gocql.Quorum
 
-	// Connect without keyspace first to create it if needed
+	// Connect without keyspace first to create it
 	session, err := cluster.CreateSession()
 	if err != nil {
 		t.Fatalf("Failed to create session: %v", err)
 	}
 
-	// Create keyspace if it doesn't exist
-	err = session.Query(`CREATE KEYSPACE IF NOT EXISTS ` + keyspace + ` WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}`).Exec()
+	// Create keyspace
+	err = session.Query(`CREATE KEYSPACE ` + keyspace + ` WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}`).Exec()
 	if err != nil {
 		session.Close()
 		t.Fatalf("Failed to create keyspace: %v", err)
@@ -52,10 +59,27 @@ func getTestSession(t *testing.T) *gocql.Session {
 	cluster.Keyspace = keyspace
 	session, err = cluster.CreateSession()
 	if err != nil {
+		// Cleanup keyspace on failure
+		cleanupSession, _ := gocql.NewCluster(hosts).CreateSession()
+		if cleanupSession != nil {
+			cleanupSession.Query(`DROP KEYSPACE IF EXISTS ` + keyspace).Exec()
+			cleanupSession.Close()
+		}
 		t.Fatalf("Failed to create session with keyspace: %v", err)
 	}
 
-	return session
+	// Register cleanup function
+	t.Cleanup(func() {
+		session.Close()
+		// Cleanup keyspace after test
+		cleanupSession, err := gocql.NewCluster(hosts).CreateSession()
+		if err == nil && cleanupSession != nil {
+			cleanupSession.Query(`DROP KEYSPACE IF EXISTS ` + keyspace).Exec()
+			cleanupSession.Close()
+		}
+	})
+
+	return session, keyspace
 }
 
 // createTestMigrations creates temporary migration files for testing.
@@ -113,14 +137,13 @@ func TestIntegration_Up(t *testing.T) {
 		t.Skip("Integration tests disabled (set SCYLLA_HOSTS and SCYLLA_KEYSPACE to enable)")
 	}
 
-	session := getTestSession(t)
-	defer session.Close()
+	session, keyspace := getTestSession(t)
 
 	migrationDir := createTestMigrations(t)
 
 	migrator, err := New(session,
 		WithDir(migrationDir),
-		WithKeyspace(os.Getenv("SCYLLA_KEYSPACE")),
+		WithKeyspace(keyspace),
 	)
 	td.CmpNoError(t, err)
 	defer migrator.Close()
@@ -135,12 +158,12 @@ func TestIntegration_Up(t *testing.T) {
 	// Verify tables exist
 	var tableName string
 	err = session.Query("SELECT table_name FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "users").Scan(&tableName)
+		keyspace, "users").Scan(&tableName)
 	td.CmpNoError(t, err)
 	td.Cmp(t, tableName, "users")
 
 	err = session.Query("SELECT table_name FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "posts").Scan(&tableName)
+		keyspace, "posts").Scan(&tableName)
 	td.CmpNoError(t, err)
 	td.Cmp(t, tableName, "posts")
 
@@ -155,14 +178,13 @@ func TestIntegration_Down(t *testing.T) {
 		t.Skip("Integration tests disabled (set SCYLLA_HOSTS and SCYLLA_KEYSPACE to enable)")
 	}
 
-	session := getTestSession(t)
-	defer session.Close()
+	session, keyspace := getTestSession(t)
 
 	migrationDir := createTestMigrations(t)
 
 	migrator, err := New(session,
 		WithDir(migrationDir),
-		WithKeyspace(os.Getenv("SCYLLA_KEYSPACE")),
+		WithKeyspace(keyspace),
 	)
 	td.CmpNoError(t, err)
 	defer migrator.Close()
@@ -181,13 +203,13 @@ func TestIntegration_Down(t *testing.T) {
 	// Verify posts table is gone
 	var count int
 	err = session.Query("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "posts").Scan(&count)
+		keyspace, "posts").Scan(&count)
 	td.CmpNoError(t, err)
 	td.Cmp(t, count, 0)
 
 	// Verify users table still exists
 	err = session.Query("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "users").Scan(&count)
+		keyspace, "users").Scan(&count)
 	td.CmpNoError(t, err)
 	td.Cmp(t, count, 1)
 }
@@ -197,14 +219,13 @@ func TestIntegration_Status(t *testing.T) {
 		t.Skip("Integration tests disabled (set SCYLLA_HOSTS and SCYLLA_KEYSPACE to enable)")
 	}
 
-	session := getTestSession(t)
-	defer session.Close()
+	session, keyspace := getTestSession(t)
 
 	migrationDir := createTestMigrations(t)
 
 	migrator, err := New(session,
 		WithDir(migrationDir),
-		WithKeyspace(os.Getenv("SCYLLA_KEYSPACE")),
+		WithKeyspace(keyspace),
 	)
 	td.CmpNoError(t, err)
 	defer migrator.Close()
@@ -236,14 +257,13 @@ func TestIntegration_UpTo(t *testing.T) {
 		t.Skip("Integration tests disabled (set SCYLLA_HOSTS and SCYLLA_KEYSPACE to enable)")
 	}
 
-	session := getTestSession(t)
-	defer session.Close()
+	session, keyspace := getTestSession(t)
 
 	migrationDir := createTestMigrations(t)
 
 	migrator, err := New(session,
 		WithDir(migrationDir),
-		WithKeyspace(os.Getenv("SCYLLA_KEYSPACE")),
+		WithKeyspace(keyspace),
 	)
 	td.CmpNoError(t, err)
 	defer migrator.Close()
@@ -258,12 +278,12 @@ func TestIntegration_UpTo(t *testing.T) {
 	// Verify only users table exists
 	var count int
 	err = session.Query("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "users").Scan(&count)
+		keyspace, "users").Scan(&count)
 	td.CmpNoError(t, err)
 	td.Cmp(t, count, 1)
 
 	err = session.Query("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "posts").Scan(&count)
+		keyspace, "posts").Scan(&count)
 	td.CmpNoError(t, err)
 	td.Cmp(t, count, 0)
 
@@ -274,7 +294,7 @@ func TestIntegration_UpTo(t *testing.T) {
 
 	// Verify both tables exist now
 	err = session.Query("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "posts").Scan(&count)
+		keyspace, "posts").Scan(&count)
 	td.CmpNoError(t, err)
 	td.Cmp(t, count, 1)
 }
@@ -284,14 +304,13 @@ func TestIntegration_DownTo(t *testing.T) {
 		t.Skip("Integration tests disabled (set SCYLLA_HOSTS and SCYLLA_KEYSPACE to enable)")
 	}
 
-	session := getTestSession(t)
-	defer session.Close()
+	session, keyspace := getTestSession(t)
 
 	migrationDir := createTestMigrations(t)
 
 	migrator, err := New(session,
 		WithDir(migrationDir),
-		WithKeyspace(os.Getenv("SCYLLA_KEYSPACE")),
+		WithKeyspace(keyspace),
 	)
 	td.CmpNoError(t, err)
 	defer migrator.Close()
@@ -311,13 +330,13 @@ func TestIntegration_DownTo(t *testing.T) {
 	// Verify posts table is gone
 	var count int
 	err = session.Query("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "posts").Scan(&count)
+		keyspace, "posts").Scan(&count)
 	td.CmpNoError(t, err)
 	td.Cmp(t, count, 0)
 
 	// Verify users table still exists
 	err = session.Query("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?",
-		os.Getenv("SCYLLA_KEYSPACE"), "users").Scan(&count)
+		keyspace, "users").Scan(&count)
 	td.CmpNoError(t, err)
 	td.Cmp(t, count, 1)
 }
@@ -327,14 +346,13 @@ func TestIntegration_Version(t *testing.T) {
 		t.Skip("Integration tests disabled (set SCYLLA_HOSTS and SCYLLA_KEYSPACE to enable)")
 	}
 
-	session := getTestSession(t)
-	defer session.Close()
+	session, keyspace := getTestSession(t)
 
 	migrationDir := createTestMigrations(t)
 
 	migrator, err := New(session,
 		WithDir(migrationDir),
-		WithKeyspace(os.Getenv("SCYLLA_KEYSPACE")),
+		WithKeyspace(keyspace),
 	)
 	td.CmpNoError(t, err)
 	defer migrator.Close()
@@ -370,14 +388,13 @@ func TestIntegration_Steps(t *testing.T) {
 		t.Skip("Integration tests disabled (set SCYLLA_HOSTS and SCYLLA_KEYSPACE to enable)")
 	}
 
-	session := getTestSession(t)
-	defer session.Close()
+	session, keyspace := getTestSession(t)
 
 	migrationDir := createTestMigrations(t)
 
 	migrator, err := New(session,
 		WithDir(migrationDir),
-		WithKeyspace(os.Getenv("SCYLLA_KEYSPACE")),
+		WithKeyspace(keyspace),
 	)
 	td.CmpNoError(t, err)
 	defer migrator.Close()
