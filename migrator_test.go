@@ -603,7 +603,7 @@ func TestMigrator_log_WithLogger(t *testing.T) {
 	m.log("test message %d", 42)
 
 	output := buf.String()
-	td.Cmp(t, output, td.String("test message 42"))
+	td.Cmp(t, output, td.Contains("test message 42"))
 }
 
 func TestMigrator_log_WithoutLogger(t *testing.T) {

@@ -485,6 +485,11 @@ func (*Migrator) parseStatements(content string) []string {
 		statements = append(statements, remaining)
 	}
 
+	// Return empty slice instead of nil if no statements found.
+	if statements == nil {
+		return []string{}
+	}
+
 	return statements
 }
 

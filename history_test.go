@@ -137,13 +137,13 @@ func TestHistorySchemaTemplate(t *testing.T) {
 	formatted := formatHistoryQuery(query, keyspace, table)
 
 	td.Cmp(t, formatted, td.NotEmpty())
-	td.Cmp(t, formatted, td.String(keyspace))
-	td.Cmp(t, formatted, td.String(table))
+	td.Cmp(t, formatted, td.Contains(keyspace))
+	td.Cmp(t, formatted, td.Contains(table))
 
 	// Verify it contains expected CQL keywords
 	expectedKeywords := []string{"CREATE TABLE", "IF NOT EXISTS", "version", "description", "checksum", "applied_at", "execution_ms", "PRIMARY KEY"}
 	for _, keyword := range expectedKeywords {
-		td.Cmp(t, formatted, td.String(keyword))
+		td.Cmp(t, formatted, td.Contains(keyword))
 	}
 }
 
