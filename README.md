@@ -24,8 +24,23 @@ go get github.com/heartwilltell/scyllamigrate
 
 ### CLI Tool
 
+> **Note:** `go install` is not supported because this module uses a `replace` directive
+> to use ScyllaDB's fork of gocql. Go does not allow `go install` for modules with replace directives.
+
+**Download pre-built binaries** from [GitHub Releases](https://github.com/heartwilltell/scyllamigrate/releases).
+
+**Or use Docker:**
+
 ```bash
-go install github.com/heartwilltell/scyllamigrate/cmd/scyllamigrate@latest
+docker pull ghcr.io/heartwilltell/scyllamigrate:latest
+```
+
+**Or build from source:**
+
+```bash
+git clone https://github.com/heartwilltell/scyllamigrate.git
+cd scyllamigrate
+go build -o scyllamigrate ./cmd
 ```
 
 ## Quick Start

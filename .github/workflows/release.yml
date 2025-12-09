@@ -51,13 +51,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-
-  verify-release:
-    name: Verify Release
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify Go Install
-        run: |
-          go install github.com/heartwilltell/scyllamigrate/cmd@${{ github.ref_name }}
-          scyllamigrate --help
