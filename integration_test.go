@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,8 +33,9 @@ func getTestSession(t *testing.T) (*gocql.Session, string) {
 
 	// Create unique keyspace per test to avoid interference
 	// Sanitize test name for CQL identifier (replace invalid chars with underscores)
+	// Convert to lowercase because ScyllaDB lowercases unquoted identifiers
 	testName := regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(t.Name(), "_")
-	keyspace := fmt.Sprintf("%s_%s_%d", baseKeyspace, testName, time.Now().UnixNano())
+	keyspace := strings.ToLower(fmt.Sprintf("%s_%s_%d", baseKeyspace, testName, time.Now().UnixNano()))
 
 	cluster := gocql.NewCluster(hosts)
 	cluster.Timeout = 30 * time.Second
