@@ -79,31 +79,33 @@ changelog:
     - title: "Other Changes"
       order: 999
 
-brews:
+homebrew_casks:
   - name: scyllamigrate
     repository:
       owner: heartwilltell
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: brew
+    directory: Casks
     homepage: "https://github.com/heartwilltell/scyllamigrate"
     description: "A lightweight schema migration tool for ScyllaDB"
     license: "MIT"
     commit_author:
       name: Serhii Mariiekha
       email: heartwilltell@gmail.com
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    commit_msg_template: "Cask update for {{ .ProjectName }} version {{ .Tag }}"
     install: |
       bin.install "scyllamigrate"
     test: |
       system "#{bin}/scyllamigrate", "--help"
 
-dockers:
-  - image_templates:
-      - "ghcr.io/heartwilltell/scyllamigrate:{{ .Tag }}"
-      - "ghcr.io/heartwilltell/scyllamigrate:v{{ .Major }}"
-      - "ghcr.io/heartwilltell/scyllamigrate:v{{ .Major }}.{{ .Minor }}"
-      - "ghcr.io/heartwilltell/scyllamigrate:latest"
+dockers_v2:
+  - images:
+      - "ghcr.io/heartwilltell/scyllamigrate"
+    tags:
+      - "{{ .Tag }}"
+      - "v{{ .Major }}"
+      - "v{{ .Major }}.{{ .Minor }}"
+      - "latest"
     dockerfile: Dockerfile
     build_flag_templates:
       - "--pull"
@@ -112,7 +114,8 @@ dockers:
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source={{.GitURL}}"
-      - "--platform=linux/amd64"
+    platforms:
+      - linux/amd64
 
 release:
   github:
