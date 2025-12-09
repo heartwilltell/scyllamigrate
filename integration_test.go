@@ -53,19 +53,43 @@ func getTestSession(t *testing.T) (*gocql.Session, string) {
 		t.Fatalf("Failed to create keyspace: %v", err)
 	}
 
+	// Wait for schema agreement to ensure keyspace is available
+	if err := session.AwaitSchemaAgreement(context.Background()); err != nil {
+		session.Close()
+		// Try to cleanup
+		cleanupSession, _ := gocql.NewCluster(hosts).CreateSession()
+		if cleanupSession != nil {
+			cleanupSession.Query(`DROP KEYSPACE IF EXISTS ` + keyspace).Exec()
+			cleanupSession.Close()
+		}
+		t.Fatalf("Failed to wait for schema agreement: %v", err)
+	}
+
 	session.Close()
 
-	// Now connect with keyspace
+	// Now connect with keyspace - retry a few times as keyspace may not be immediately available
 	cluster.Keyspace = keyspace
-	session, err = cluster.CreateSession()
-	if err != nil {
+	var finalSession *gocql.Session
+	var connectErr error
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		finalSession, connectErr = cluster.CreateSession()
+		if connectErr == nil {
+			session = finalSession
+			break
+		}
+		if i < maxRetries-1 {
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	if connectErr != nil {
 		// Cleanup keyspace on failure
 		cleanupSession, _ := gocql.NewCluster(hosts).CreateSession()
 		if cleanupSession != nil {
 			cleanupSession.Query(`DROP KEYSPACE IF EXISTS ` + keyspace).Exec()
 			cleanupSession.Close()
 		}
-		t.Fatalf("Failed to create session with keyspace: %v", err)
+		t.Fatalf("Failed to create session with keyspace after %d retries: %v", maxRetries, connectErr)
 	}
 
 	// Register cleanup function
