@@ -75,7 +75,7 @@ clean: ## Clean build artifacts
 
 docker-up: ## Start ScyllaDB with docker-compose
 	@echo "Starting ScyllaDB..."
-	@docker-compose up -d
+	@docker compose up -d
 	@echo "Waiting for ScyllaDB to be ready..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
@@ -95,11 +95,11 @@ docker-up: ## Start ScyllaDB with docker-compose
 
 docker-down: ## Stop ScyllaDB
 	@echo "Stopping ScyllaDB..."
-	@docker-compose down
+	@docker compose down
 	@echo "ScyllaDB stopped"
 
 docker-logs: ## Show ScyllaDB logs
-	@docker-compose logs -f scylla
+	@docker compose logs -f scylla
 
 check: fmt vet lint ## Run all checks (format, vet, lint)
 
