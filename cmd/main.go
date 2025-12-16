@@ -28,6 +28,7 @@ type config struct {
 	consistency string
 	timeout     time.Duration
 	table       string
+	datacenter  string
 }
 
 // Global configuration flags.
@@ -67,6 +68,9 @@ func main() {
 			)
 			f.StringVarE(&cfg.table, "table", "SCYLLA_MIGRATIONS_TABLE", "schema_migrations",
 				"Migration history table name",
+			)
+			f.StringVarE(&cfg.datacenter, "datacenter", "SCYLLA_DATACENTER", "",
+				"Local datacenter for DC-aware routing (enables TokenAwareHostPolicy with DCAwareRoundRobinPolicy)",
 			)
 		},
 	}
@@ -330,6 +334,13 @@ func createMigrator() (*managedMigrator, error) {
 	cluster.Keyspace = cfg.keyspace
 	cluster.Consistency = parseConsistency(cfg.consistency)
 	cluster.Timeout = cfg.timeout
+
+	// Configure datacenter-aware routing if datacenter is specified.
+	if cfg.datacenter != "" {
+		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+			gocql.DCAwareRoundRobinPolicy(cfg.datacenter),
+		)
+	}
 
 	// Create session.
 	session, err := cluster.CreateSession()

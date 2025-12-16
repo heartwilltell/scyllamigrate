@@ -86,6 +86,9 @@ scyllamigrate status -hosts=localhost:9042 -keyspace=myapp
 
 # Rollback the last migration
 scyllamigrate down -hosts=localhost:9042 -keyspace=myapp
+
+# Use datacenter-aware routing for multi-DC deployments
+scyllamigrate up -hosts=node1:9042,node2:9042,node3:9042 -keyspace=myapp -datacenter=AWS_EU_WEST_1
 ```
 
 #### Using the Go API
@@ -211,6 +214,7 @@ Migration files must follow this naming pattern:
 | `-consistency` | `SCYLLA_CONSISTENCY` | `quorum` | Consistency level |
 | `-timeout` | `SCYLLA_TIMEOUT` | `30s` | Operation timeout |
 | `-table` | `SCYLLA_MIGRATIONS_TABLE` | `schema_migrations` | Migration history table name |
+| `-datacenter` | `SCYLLA_DATACENTER` | (empty) | Local datacenter for DC-aware routing (enables TokenAwareHostPolicy with DCAwareRoundRobinPolicy) |
 
 ### Commands
 
@@ -306,6 +310,30 @@ migrator, err := scyllamigrate.New(session,
     scyllamigrate.WithSchemaAgreement(true),         // Optional: wait for schema agreement
 )
 ```
+
+### Datacenter-Aware Routing
+
+For multi-datacenter deployments, configure DC-aware routing when creating the gocql session:
+
+```go
+cluster := gocql.NewCluster("node1:9042", "node2:9042", "node3:9042")
+cluster.Keyspace = "myapp"
+cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+    gocql.DCAwareRoundRobinPolicy("AWS_EU_WEST_1"),
+)
+session, err := cluster.CreateSession()
+if err != nil {
+    log.Fatal(err)
+}
+defer session.Close()
+
+migrator, err := scyllamigrate.New(session,
+    scyllamigrate.WithDir("./migrations"),
+    scyllamigrate.WithKeyspace("myapp"),
+)
+```
+
+This minimizes cross-datacenter traffic by preferring local datacenter nodes.
 
 ### Available Methods
 
