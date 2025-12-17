@@ -29,6 +29,8 @@ type config struct {
 	timeout     time.Duration
 	table       string
 	datacenter  string
+	username    string
+	password    string
 }
 
 // Global configuration flags.
@@ -71,6 +73,12 @@ func main() {
 			)
 			f.StringVarE(&cfg.datacenter, "datacenter", "SCYLLA_DATACENTER", "",
 				"Local datacenter for DC-aware routing (enables TokenAwareHostPolicy with DCAwareRoundRobinPolicy)",
+			)
+			f.StringVarE(&cfg.username, "username", "SCYLLA_USERNAME", "",
+				"ScyllaDB username for authentication",
+			)
+			f.StringVarE(&cfg.password, "password", "SCYLLA_PASSWORD", "",
+				"ScyllaDB password for authentication",
 			)
 		},
 	}
@@ -343,6 +351,14 @@ func createMigrator() (*managedMigrator, error) {
 		)
 	}
 
+	// Configure authentication if username and password are provided.
+	if cfg.username != "" && cfg.password != "" {
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: cfg.username,
+			Password: cfg.password,
+		}
+	}
+
 	// Create session.
 	session, err := cluster.CreateSession()
 	if err != nil {
@@ -447,6 +463,14 @@ Examples:
 				cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
 					gocql.DCAwareRoundRobinPolicy(cfg.datacenter),
 				)
+			}
+
+			// Configure authentication if username and password are provided.
+			if cfg.username != "" && cfg.password != "" {
+				cluster.Authenticator = gocql.PasswordAuthenticator{
+					Username: cfg.username,
+					Password: cfg.password,
+				}
 			}
 
 			// Create session.
