@@ -13,6 +13,7 @@ func TestError_Error(t *testing.T) {
 		err      Error
 		expected string
 	}
+	
 	tests := map[string]tcase{
 		"ErrNoSource": {
 			err:      ErrNoSource,
