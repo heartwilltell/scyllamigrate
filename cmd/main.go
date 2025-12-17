@@ -506,7 +506,7 @@ func parseNetworkTopology(s string) (map[string]int, error) {
 
 		dc := strings.TrimSpace(parts[0])
 		if dc == "" {
-			return nil, fmt.Errorf("invalid network topology: empty datacenter name")
+			return nil, errors.New("invalid network topology: empty datacenter name")
 		}
 
 		var rf int
@@ -522,7 +522,7 @@ func parseNetworkTopology(s string) (map[string]int, error) {
 	}
 
 	if len(result) == 0 {
-		return nil, fmt.Errorf("network topology must specify at least one datacenter")
+		return nil, errors.New("network topology must specify at least one datacenter")
 	}
 
 	return result, nil

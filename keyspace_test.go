@@ -170,12 +170,12 @@ func TestDropKeyspace_Validation(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("nil session", func(t *testing.T) {
-		err := DropKeyspace(ctx, nil, "test", true)
+		err := DropKeyspace(ctx, nil, "test", WithDropIfExists(true))
 		td.Cmp(t, err, ErrNoSession)
 	})
 
 	t.Run("empty keyspace name", func(t *testing.T) {
-		err := DropKeyspace(ctx, nil, "", true)
+		err := DropKeyspace(ctx, nil, "", WithDropIfExists(true))
 		td.Cmp(t, err, ErrNoSession) // nil session check comes first
 	})
 }
@@ -223,7 +223,7 @@ func TestIntegration_CreateKeyspace_SimpleStrategy(t *testing.T) {
 
 	// Cleanup after test
 	t.Cleanup(func() {
-		DropKeyspace(ctx, session, keyspace, true)
+		DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	})
 
 	// Create keyspace
@@ -249,7 +249,7 @@ func TestIntegration_CreateKeyspace_WithDurableWritesDisabled(t *testing.T) {
 
 	// Cleanup after test
 	t.Cleanup(func() {
-		DropKeyspace(ctx, session, keyspace, true)
+		DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	})
 
 	// Create keyspace with durable writes disabled
@@ -283,7 +283,7 @@ func TestIntegration_CreateKeyspace_IfNotExists(t *testing.T) {
 
 	// Cleanup after test
 	t.Cleanup(func() {
-		DropKeyspace(ctx, session, keyspace, true)
+		DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	})
 
 	// Create keyspace first time
@@ -321,7 +321,7 @@ func TestIntegration_KeyspaceExists(t *testing.T) {
 
 	// Cleanup after test
 	t.Cleanup(func() {
-		DropKeyspace(ctx, session, keyspace, true)
+		DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	})
 
 	// Keyspace should exist now
@@ -349,7 +349,7 @@ func TestIntegration_DropKeyspace(t *testing.T) {
 	td.Cmp(t, exists, true)
 
 	// Drop keyspace
-	err = DropKeyspace(ctx, session, keyspace, false)
+	err = DropKeyspace(ctx, session, keyspace)
 	td.CmpNoError(t, err)
 
 	// Verify it no longer exists
@@ -368,7 +368,7 @@ func TestIntegration_DropKeyspace_IfExists(t *testing.T) {
 	keyspace := generateTestKeyspaceName(t)
 
 	// Drop non-existent keyspace with IF EXISTS should succeed
-	err := DropKeyspace(ctx, session, keyspace, true)
+	err := DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	td.CmpNoError(t, err)
 }
 
@@ -529,7 +529,7 @@ func TestIntegration_CreateKeyspace_AlreadyExists_NoIfNotExists(t *testing.T) {
 
 	// Cleanup after test
 	t.Cleanup(func() {
-		DropKeyspace(ctx, session, keyspace, true)
+		DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	})
 
 	// Create keyspace first time
@@ -563,7 +563,7 @@ func TestIntegration_DropKeyspace_NonExistent_NoIfExists(t *testing.T) {
 	keyspace := generateTestKeyspaceName(t)
 
 	// Drop non-existent keyspace without IF EXISTS should fail
-	err := DropKeyspace(ctx, session, keyspace, false)
+	err := DropKeyspace(ctx, session, keyspace)
 	td.CmpError(t, err)
 
 	// Verify it's a KeyspaceError
@@ -584,7 +584,7 @@ func TestIntegration_CreateAndUseMigrations(t *testing.T) {
 
 	// Cleanup after test
 	t.Cleanup(func() {
-		DropKeyspace(ctx, session, keyspace, true)
+		DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	})
 
 	// Create keyspace using the new function
@@ -677,7 +677,7 @@ func TestIntegration_CreateKeyspace_VerifyReplicationSettings(t *testing.T) {
 
 	// Cleanup after test
 	t.Cleanup(func() {
-		DropKeyspace(ctx, session, keyspace, true)
+		DropKeyspace(ctx, session, keyspace, WithDropIfExists(true))
 	})
 
 	// Create keyspace with specific replication factor

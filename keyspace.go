@@ -143,8 +143,22 @@ func KeyspaceExists(ctx context.Context, session *gocql.Session, name string) (b
 	return count > 0, nil
 }
 
+// DropKeyspaceOption configures DropKeyspace behavior.
+type DropKeyspaceOption func(*dropKeyspaceConfig)
+
+type dropKeyspaceConfig struct {
+	IfExists bool
+}
+
+// WithDropIfExists sets whether to use IF EXISTS clause when dropping keyspace.
+func WithDropIfExists(ifExists bool) DropKeyspaceOption {
+	return func(c *dropKeyspaceConfig) {
+		c.IfExists = ifExists
+	}
+}
+
 // DropKeyspace drops a keyspace.
-func DropKeyspace(ctx context.Context, session *gocql.Session, name string, ifExists bool) error {
+func DropKeyspace(ctx context.Context, session *gocql.Session, name string, opts ...DropKeyspaceOption) error {
 	if session == nil {
 		return ErrNoSession
 	}
@@ -153,8 +167,18 @@ func DropKeyspace(ctx context.Context, session *gocql.Session, name string, ifEx
 		return ErrNoKeyspace
 	}
 
+	// Default configuration.
+	cfg := &dropKeyspaceConfig{
+		IfExists: false,
+	}
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	var cql string
-	if ifExists {
+	if cfg.IfExists {
 		cql = fmt.Sprintf("DROP KEYSPACE IF EXISTS %s", name)
 	} else {
 		cql = fmt.Sprintf("DROP KEYSPACE %s", name)
@@ -197,7 +221,7 @@ func buildCreateKeyspaceCQL(cfg *KeyspaceConfig) string {
 			sb.WriteString(fmt.Sprintf(", '%s': %d", dc, rf))
 		}
 
-	default: // SimpleStrategy
+	default: // SimpleStrategy.
 		sb.WriteString(fmt.Sprintf("'class': 'SimpleStrategy', 'replication_factor': %d", cfg.ReplicationFactor))
 	}
 
