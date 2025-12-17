@@ -81,6 +81,7 @@ func main() {
 		statusCmd(),
 		createCmd(),
 		versionCmd(),
+		createKeyspaceCmd(),
 	)
 
 	if err := rootCmd.Exec(); err != nil {
@@ -394,6 +395,137 @@ func parseConsistency(s string) gocql.Consistency {
 	}
 
 	return gocql.Quorum
+}
+
+func createKeyspaceCmd() *scotty.Command {
+	var (
+		replicationFactor int
+		networkTopology   string
+		durableWrites     bool
+		ifNotExists       bool
+	)
+
+	return &scotty.Command{
+		Name:  "create-keyspace",
+		Short: "Create a new keyspace",
+		Long: `Create a new keyspace with the specified replication settings.
+
+Examples:
+  # Create keyspace with SimpleStrategy (default)
+  scyllamigrate create-keyspace -keyspace myapp -rf 3
+
+  # Create keyspace with NetworkTopologyStrategy
+  scyllamigrate create-keyspace -keyspace myapp -network-topology "dc1:3,dc2:2"
+
+  # Create keyspace without durable writes (for testing)
+  scyllamigrate create-keyspace -keyspace myapp -durable-writes=false`,
+		SetFlags: func(f *scotty.FlagSet) {
+			f.IntVar(&replicationFactor, "rf", 1, "Replication factor for SimpleStrategy")
+			f.StringVar(&networkTopology, "network-topology", "",
+				"Datacenter replication for NetworkTopologyStrategy (format: dc1:rf1,dc2:rf2)")
+			f.BoolVar(&durableWrites, "durable-writes", true, "Enable durable writes")
+			f.BoolVar(&ifNotExists, "if-not-exists", true, "Only create if keyspace doesn't exist")
+		},
+		Run: func(_ *scotty.Command, _ []string) error {
+			if cfg.keyspace == "" {
+				return errors.New("keyspace is required (use -keyspace or SCYLLA_KEYSPACE)")
+			}
+
+			// Parse hosts.
+			hostList := strings.Split(cfg.hosts, ",")
+			for i := range hostList {
+				hostList[i] = strings.TrimSpace(hostList[i])
+			}
+
+			// Create cluster configuration without keyspace.
+			cluster := gocql.NewCluster(hostList...)
+			cluster.Consistency = parseConsistency(cfg.consistency)
+			cluster.Timeout = cfg.timeout
+
+			// Configure datacenter-aware routing if datacenter is specified.
+			if cfg.datacenter != "" {
+				cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(
+					gocql.DCAwareRoundRobinPolicy(cfg.datacenter),
+				)
+			}
+
+			// Create session.
+			session, err := cluster.CreateSession()
+			if err != nil {
+				return fmt.Errorf("failed to connect to ScyllaDB: %w", err)
+			}
+			defer session.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
+			defer cancel()
+
+			// Build keyspace options.
+			var opts []scyllamigrate.KeyspaceOption
+
+			if networkTopology != "" {
+				datacenters, err := parseNetworkTopology(networkTopology)
+				if err != nil {
+					return err
+				}
+
+				opts = append(opts, scyllamigrate.WithNetworkTopology(datacenters))
+			} else {
+				opts = append(opts, scyllamigrate.WithReplicationFactor(replicationFactor))
+			}
+
+			opts = append(opts, scyllamigrate.WithDurableWrites(durableWrites))
+			opts = append(opts, scyllamigrate.WithIfNotExists(ifNotExists))
+
+			// Create keyspace.
+			if err := scyllamigrate.CreateKeyspace(ctx, session, cfg.keyspace, opts...); err != nil {
+				return err
+			}
+
+			fmt.Printf("Keyspace %q created successfully\n", cfg.keyspace)
+
+			return nil
+		},
+	}
+}
+
+// parseNetworkTopology parses a network topology string in format "dc1:rf1,dc2:rf2".
+func parseNetworkTopology(s string) (map[string]int, error) {
+	result := make(map[string]int)
+
+	pairs := strings.Split(s, ",")
+	for _, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+
+		parts := strings.SplitN(pair, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid network topology format %q: expected dc:rf", pair)
+		}
+
+		dc := strings.TrimSpace(parts[0])
+		if dc == "" {
+			return nil, fmt.Errorf("invalid network topology: empty datacenter name")
+		}
+
+		var rf int
+		if _, err := fmt.Sscanf(parts[1], "%d", &rf); err != nil {
+			return nil, fmt.Errorf("invalid replication factor %q for datacenter %q", parts[1], dc)
+		}
+
+		if rf < 1 {
+			return nil, fmt.Errorf("replication factor must be at least 1, got %d for datacenter %q", rf, dc)
+		}
+
+		result[dc] = rf
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("network topology must specify at least one datacenter")
+	}
+
+	return result, nil
 }
 
 // findNextVersion scans the migrations directory and returns the next version number.

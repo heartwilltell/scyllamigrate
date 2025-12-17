@@ -96,3 +96,18 @@ func (e *SourceError) Error() string {
 
 // Unwrap returns the underlying error.
 func (e *SourceError) Unwrap() error { return e.Err }
+
+// KeyspaceError wraps an error that occurred during keyspace operations.
+type KeyspaceError struct {
+	Keyspace string
+	Op       string
+	Err      error
+}
+
+// Error implements the error interface.
+func (e *KeyspaceError) Error() string {
+	return fmt.Sprintf("scyllamigrate: keyspace error for %q (%s): %v", e.Keyspace, e.Op, e.Err)
+}
+
+// Unwrap returns the underlying error.
+func (e *KeyspaceError) Unwrap() error { return e.Err }
