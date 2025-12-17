@@ -31,7 +31,7 @@ type KeyspaceConfig struct {
 	ReplicationFactor int
 
 	// Datacenters maps datacenter names to replication factors for NetworkTopologyStrategy.
-	// Example: {"dc1": 3, "dc2": 2}
+	// Example: {"dc1": 3, "dc2": 2}.
 	Datacenters map[string]int
 
 	// DurableWrites enables durable writes (default: true).
